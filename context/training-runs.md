@@ -114,7 +114,13 @@ Add a new entry at the top for each run, using the template below. Keep entries 
 
 ### Outcome / next
 - First checkpoint trains and the pipeline works end-to-end, but the model does **not** usefully
-  action-condition → **not plan-ready**. This is a data/representation SNR issue, not training length.
-- **Next:** (1) retrain short with best-val checkpointing + EarlyStopping at **f=8–10** (larger motion
-  per chunk), re-run the diagnostic at each f; (2) if still failing, raise capture SNR / fallback
-  options in [[open-questions]]. Do NOT just train longer.
+  action-condition → **not plan-ready**. This is a data/representation issue, not training length.
+- **Update (2026-06-02, frame-interval sweep — `viz/signal-fsweep/`):** the root cause is specifically
+  **translation observability**. Across f=5/8/10/15/20 (previewed with no retraining), `corr(|Δx|,
+  SD-VAE latentL2) ≈ 0` at every f (the elevated ~55° camera de-magnifies forward motion), while
+  `corr(|Δθ|, latentL2) ≈ 0.64–0.70` (rotation is well observed). **⇒ the f=8–10 plan below is
+  REFUTED** — raising f grows Δx 4× but leaves the correlation at ~0.
+- **Next (revised):** ~~retrain at f=8–10~~ → instead, **change the camera/representation to restore
+  translation observability** (re-tilt/relocate camera for parallax, and/or add pose/odometry auxiliary
+  conditioning for Δx), raise capture SNR (exposure/WB lock, avoid lossy AV1), then re-collect/retrain
+  and re-run the diagnostic. See [[experiment-log]], [[open-questions]]. Do NOT just train longer.

@@ -50,11 +50,13 @@ best-val checkpoint) and was stopped at ~23K steps. See [[runpod-setup]], [[trai
 
 `action_diagnostic.py` (GT / zero / random rollouts): GT latent-L2 must clearly beat zero/random and
 action-embedding RMS must be ~0.1+. **Run 001 (step-10K ckpt): FAIL** — RMS **0.0088**, GT 37.8 vs
-zero 42.0 / random 42.4. Root cause is **weak action SNR**: per-chunk motion is bang-bang/tiny
-(~1.67 cm), and the action-driven latent change sits below the non-action noise floor
-(corr(|Δx|, latentL2)=0.23) — quantified by `gt_rollout_viz.py` + `chunk_motion_viz.py`. Fix is
-**f=8–10** (more motion per chunk) + best-val checkpointing, not more training. See [[open-questions]],
-[[training-runs]], [[training]].
+zero 42.0 / random 42.4. Root cause, refined by the 2026-06-02 **frame-interval sweep** (f=5→20, no
+retraining; `viz/signal-fsweep/`): the failure is **translation-observability** — `corr(|Δx|, latentL2)
+≈ 0` at *every* f (the elevated ~55° camera de-magnifies forward motion), while `corr(|Δθ|, latentL2)
+≈ 0.64–0.70` (rotation is well observed). **⇒ the earlier "fix = f=8–10" is REFUTED** (raising f grows
+Δx 4× but leaves corr at ~0). The fix must restore translation observability (camera relocation/tilt
+for parallax, and/or auxiliary pose/odometry conditioning for Δx) + lower the non-action latent floor
+(exposure/WB lock, avoid lossy AV1). See [[open-questions]], [[experiment-log]], [[training-runs]].
 
 ## ⬜ Stage 6 — Short-Range Planner (CEM/MPC)
 
@@ -76,7 +78,9 @@ actions. See [[open-questions]].
 
 ## Current critical path
 
-✅ 3a (built) → ✅ 4 (Run 001 trained, overfit) → ❌ 5 (diagnostic FAILED — weak action SNR) →
-**▶️ retrain at f=8–10 with best-val checkpointing + EarlyStopping, re-run diagnostic** → (gate must
-pass before) 6 (planner). The diagnostic FAIL is the current blocker; do not build the planner until
-the action branch is healthy (RMS ~0.1+).
+✅ 3a (built) → ✅ 4 (Run 001 trained, overfit) → ❌ 5 (diagnostic FAILED — **translation
+unobservable**; ~~f=8–10~~ refuted by the f-sweep) → **▶️ decide the camera/representation fix
+(re-tilt/relocate camera for translational parallax, and/or add pose/odometry aux conditioning for
+Δx; raise capture SNR)** → re-collect/retrain → re-run diagnostic → (gate must pass before) 6
+(planner). The diagnostic FAIL is the current blocker; do not build the planner until the action
+branch is healthy (RMS ~0.1+).

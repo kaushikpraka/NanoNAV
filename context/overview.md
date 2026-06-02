@@ -6,14 +6,16 @@ Use NanoWM (a diffusion-forcing world model) for goal-conditioned navigation on 
 
 ## Current Phase
 
-**Phase 4→5: First checkpoint trained; action-conditioning diagnostic FAILED.** Dataset built (50 eps
-/ 44,926 frames → `/workspace/data/lekiwi`) and NanoWM-B/2 **Run 001** trained on a RunPod H100 (uv
-venv, `integrate_se2`, f=5, eff-bs 64). It **overfit by epoch ~3** and **failed the Table 5/6 gate**
-(action-embed RMS 0.0088 ≪ 0.1): the model barely uses actions. Root cause (quantified by
-`chunk_motion_viz.py`): **weak action SNR** — per-chunk motion is bang-bang/tiny (~1.67 cm) and the
-action-driven latent change sits below the non-action noise floor. **Next: retrain at f=8–10 (more
-motion per chunk) with best-val checkpointing + EarlyStopping, re-run the diagnostic** — not more
-training. See [[training-runs]] (Run 001), [[open-questions]], [[runpod-setup]].
+**Phase 4→5: First checkpoint trained; action-conditioning diagnostic FAILED — root cause is
+translation-observability.** Dataset built (50 eps / 44,926 frames → `/workspace/data/lekiwi`) and
+NanoWM-B/2 **Run 001** trained on a RunPod H100 (uv venv, `integrate_se2`, f=5, eff-bs 64). It
+**overfit by epoch ~3** and **failed the Table 5/6 gate** (action-embed RMS 0.0088 ≪ 0.1). A
+frame-interval sweep (f=5→20, no retraining; `chunk_motion_viz.py`, `viz/signal-fsweep/`) localized
+the cause: **the elevated ~55° camera de-magnifies forward motion** — `corr(|Δx|, SD-VAE latentL2) ≈ 0`
+at *every* f, while rotation is well observed (`corr(|Δθ|, latentL2) ≈ 0.64–0.70`). **Raising f is
+refuted as the fix.** **Next: a camera/representation change to restore translation observability**
+(re-tilt/relocate the camera for parallax, and/or add pose/odometry auxiliary conditioning for Δx;
+raise capture SNR). See [[training-runs]] (Run 001), [[experiment-log]], [[open-questions]].
 
 ## Project Tracking
 

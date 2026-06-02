@@ -8,6 +8,11 @@
 ### Frame interval f tuning
 f=5 (167ms chunks) matches PushT baseline. Navigation may benefit from larger f (more ground covered per model step, same CEM dimensionality). But larger f → larger Δx → coarser body-frame delta approximation. Test f=5 first, try f=8-10 if CEM reach is insufficient.
 
+**Resolved for the action-conditioning purpose (2026-06-02):** raising f does **not** improve action
+observability — `corr(|Δx|, latentL2) ≈ 0` for all f∈{5,8,10,15,20} (translation is de-magnified by the
+high camera), while rotation is already observable. f may still matter for *CEM reach* later, but it is
+**not** a lever for the failed action diagnostic. See the "weak action SNR" update below + `viz/signal-fsweep/`.
+
 ### Trajectory validation tool
 Need to build offline visualization: take raw velocity logs, integrate body-frame deltas, plot world-frame trajectory, verify against odometry. Confirms the integration math before training.
 
@@ -45,9 +50,22 @@ only ~10% better). Root cause, from `chunk_motion_viz.py` over 960 chunks:
   beats "predict no change."
 
 **This is a data/representation SNR problem, not a training-length problem — more steps will not fix
-it.** Highest-leverage fixes: (1) **frame_interval 8–10+** (larger motion per chunk, above the noise
-floor — re-run the diagnostic at each f); (2) raise capture SNR (controlled lighting/exposure, more
-deliberate/longer translations); then the fallback options below.
+it.** Highest-leverage fixes: (1) ~~**frame_interval 8–10+**~~ — see the update below; (2) raise capture
+SNR (controlled lighting/exposure, more deliberate/longer translations); then the fallback options below.
+
+**UPDATE (2026-06-02, frame-interval sweep) — it's specifically TRANSLATION that's unobservable, and
+raising `f` does NOT fix it.** Previewed per-chunk SD-VAE latent change at f = 5/8/10/15/20 with no
+retraining, split by action component (`chunk_motion_viz.py`; figures in `viz/signal-fsweep/`):
+- **`corr(|Δx|, latentL2) ≈ 0` at every f** (−0.04 … +0.04). Forward motion is geometrically
+  de-magnified by the elevated ~55° camera — a full-speed forward chunk barely moves the latent, and
+  growing Δx 4× (f=5→20) leaves the correlation at ~0. **So `frame_interval` is refuted as the fix.**
+- **`corr(|Δθ|, latentL2) ≈ 0.64–0.70` at every f** — rotation sweeps the whole FOV and *is* well
+  observed. The action-branch failure is a **translation-observability** problem, not a generic one.
+- Correction: the earlier `corr(|Δx|,·)≈0.23` was a noisy small subset; stable estimate is ~0.
+
+⇒ The fix must restore *translation* observability: a **lower / more forward-facing camera** (or
+richer near-field floor texture) for parallax per cm, and/or **auxiliary pose/odometry conditioning**
+for Δx (fallback #1 below), plus lowering the non-action floor (exposure/WB lock, avoid lossy AV1).
 
 ### If Table 5/6 fails — fallback options
 1. Add absolute global pose as auxiliary conditioning (environment-specific but maximally informative)

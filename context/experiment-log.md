@@ -119,6 +119,35 @@ Stopped Run 001 early (cost + overfitting) and evaluated the step-10K checkpoint
   resolver stub so saved configs load standalone), `sampling_utils.py` (same resolver), and two new
   eval scripts.
 
+## 2026-06-02 — Frame-interval sweep: translation is unobservable, rotation is — refutes "raise f"
+
+Tested the roadmap's "retrain at f=8–10" hypothesis *before* spending GPU on it, by previewing the
+per-chunk SD-VAE latent change across **f = 5/8/10/15/20** with no retraining (`chunk_motion_viz.py`
+now takes `--frame-interval`; the checkpoint supplies only the frozen SD-VAE + config). Then, prompted
+by the question "does the high camera mount dampen image change?", split the signal by **action
+component** (`corr(|Δx|, latentL2)` vs `corr(|Δθ|, latentL2)`) and surfaced diverse drive/rotate/arc
+example chunks (de-duped by episode+time). All measured in **SD-VAE latent space** (latL2 = ‖Δz‖_F),
+the quantity v-prediction is trained on. Figures + numbers in `viz/signal-fsweep/` (README has the table).
+
+- **Translation (Δx) is essentially invisible to this camera: `corr(|Δx|, latentL2) ≈ 0` at every f**
+  (−0.04 … +0.04). A full-speed forward chunk (Δx=3.33 cm @ f=10) moves the latent ~latL2 27; raising
+  f to 20 grows Δx 4× but leaves the correlation at ~0. The elevated ~55° downward mount geometrically
+  **de-magnifies forward motion**.
+- **Rotation (Δθ) is strongly observable: `corr(|Δθ|, latentL2) ≈ 0.64–0.70` at every f.** Pure-rotation
+  chunks (Δx=0, Δθ≈9.5°) reach latL2 ~46; arcs ~51–54. Rotation sweeps the whole wide FOV.
+- **So the Run 001 action-branch failure is specifically a *translation-observability* problem**, not a
+  generic SNR/training-length problem — and **`frame_interval` cannot fix it** (the latent saturates and
+  the non-action floor grows with the time window). This **refutes the f=8–10 plan** as the fix.
+- Highest-leverage fixes now target translation: a **lower / more forward-facing camera** (or richer
+  near-field floor texture) for parallax per cm; **auxiliary odometry/pose conditioning** for Δx;
+  lower the non-action floor (exposure/white-balance lock, avoid lossy AV1). See [[open-questions]].
+- Correction to the prior eval note: the earlier `corr(|Δx|,latentL2)≈0.23` was a noisy small in-order
+  subset; the stable seed-42 / n_batches-40 estimate (~5–7k chunks/f) is ~0.
+- **Tooling (fork `chunk_motion_viz.py`):** added `--frame-interval` (preview any f w/o retraining),
+  `--seed` (sample scenes across episodes), `--example-mode {mixed,forward,rotate,arc}` with
+  episode+time de-dup, a `corr(|Δθ|,·)` panel, and switched the example montage's 3rd column from a
+  pixel |diff| to the **SD-VAE per-cell ‖Δz‖ map**.
+
 ### Next Steps
 
 1. ~~Set up room environment (lighting, object positions, arm parking config)~~ ✅
@@ -126,6 +155,9 @@ Stopped Run 001 early (cost + overfitting) and evaluated the step-10K checkpoint
 3. ~~Collect teleop episodes with PS5 controller~~ ✅ — merged to `kaushikpraka/wm-smallarea_merged`
 4. ~~Build dataset: top-camera v2.1 + body-frame delta integration~~ ✅ — `/workspace/data/lekiwi`
 5. ~~Train first NanoWM-B/2 checkpoint~~ ✅ Run 001 (overfit; stopped ~23K)
-6. ~~Run Table 5/6 action diagnostic~~ ✅ **FAILED** (RMS 0.0088) — root cause = weak action SNR
-7. **Retrain at f=8–10 with best-val checkpointing + EarlyStopping, re-run diagnostic** ← current
-8. SD-VAE visual-flow `compare` (Stage 3b) — partly addressed by `chunk_motion_viz.py` (latentL2 per chunk)
+6. ~~Run Table 5/6 action diagnostic~~ ✅ **FAILED** (RMS 0.0088)
+7. ~~Retrain at f=8–10~~ ❌ **refuted** by the f-sweep — translation is unobservable at all f; raising f
+   won't revive the action branch (rotation already is observable).
+8. **Decide the camera/representation fix** ← current. Options: relocate/re-tilt camera for translational
+   parallax; add absolute-pose / odometry auxiliary conditioning for Δx; raise capture SNR
+   (exposure/WB lock, lossless codec). See [[open-questions]], [[roadmap]].
