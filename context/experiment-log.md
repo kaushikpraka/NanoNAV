@@ -71,12 +71,37 @@ hydra-compose, numpy-equivalence); the rest is pod-run.
 Pending (pod): run the dataset build, train, run the diagnostic. Fork changes must be committed +
 pushed to GitHub before the pod clones them.
 
+## 2026-06-02 — RunPod bring-up: env repair, dataset build, training launched (Run 001)
+
+Brought up a fresh RunPod H100 and got NanoWM-B/2 training. The upstream `environment.yml` was
+unbuildable and the LeKiwi path had integration gaps; the fixes are committed to the fork `main`
+(`nano-world-model`) and NanoNAV `main`. Full operational detail in [[training-runs]] Run 001;
+realized integration summary in [[nanowm-integration]]; env reality in [[runpod-setup]].
+
+- **Env (uv, not conda).** Once torch went to pip cu124 wheels, conda only provided Python, so the
+  env is a uv venv (`/workspace/nanowm-venv`). Repaired pins: `lerobot==0.3.3` (the
+  `lerobot-datasets==2.1.0` pin is a non-existent package); `python=3.11`; torch/vision/codec
+  `2.6.0/0.21.0/0.2.1+cu124`; diffusers `0.32.2`; transformers `4.46.3`; `huggingface-hub<1.0`;
+  **`pytorch-lightning==2.5.2`** (the code uses PL 2.x APIs — the 1.9.5 pin was stale, like
+  `lerobot-datasets`); system `ffmpeg`.
+- **Dataset built** to `/workspace/data/lekiwi` (50 eps / 44,926 frames, loads + decodes). Builder
+  needed two lerobot-0.3.3 fixes (`add_frame(task=...)`, tuple feature shapes). Added a parallel
+  **decode-once → sharded-encode → merge** path (~6 min vs ~45–60 min; verified byte-identical).
+- **Integration fixes:** factory routes `lekiwi` → LeRobot loader; data source forces the **pyav**
+  video backend (system FFmpeg 4.4 makes torchcodec flaky on AV1) and reads action/state from the
+  parquet (the old per-frame video decode made action stats take ~47 min → now seconds).
+- **Training: Run 001 running** — NanoWM-B/2, `integrate_se2`, f=5, eff-bs 64, 50K steps, 1× H100,
+  bf16. ~1.9 it/s (~7–8 h), loss decreasing (0.73 → 0.30 by ~step 1.8K). wandb run `x3ub`.
+- **Diagnostic scheduled on the pod** (tmux `diag`): waits for training to finish, then runs
+  `action_diagnostic.py` on the final checkpoint (a remote `/schedule` agent can't reach the pod's
+  checkpoint/GPU).
+
 ### Next Steps
 
 1. ~~Set up room environment (lighting, object positions, arm parking config)~~ ✅
 2. ~~Verify lerobot-record logging pipeline (camera + velocity at 30 Hz, no v_y)~~ ✅
 3. ~~Collect teleop episodes with PS5 controller~~ ✅ — merged to `kaushikpraka/wm-smallarea_merged`
-4. Build dataset: SD-VAE encoding + body-frame delta integration ← **current**
-5. Validate integration with trajectory visualization tool
-6. Train first NanoWM-B/2 checkpoint
-7. Run Table 5/6 diagnostic
+4. ~~Build dataset: top-camera v2.1 + body-frame delta integration~~ ✅ — `/workspace/data/lekiwi`
+5. ~~Train first NanoWM-B/2 checkpoint~~ ▶️ **Run 001 training now** (wandb `x3ub`)
+6. Run Table 5/6 action diagnostic at ~50K steps ← scheduled on the pod (tmux `diag`)
+7. Validate integration with SD-VAE visual-flow `compare` (Stage 3b, still open)

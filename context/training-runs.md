@@ -75,8 +75,11 @@ Add a new entry at the top for each run, using the template below. Keep entries 
 
 ### Progress
 - integrate_se2 action stats (f=5): mean=[0.0111, -0.00029], std=[0.0071, 0.0355]
-- step ~46: train_loss 0.727 → 0.603 (decreasing), ramping toward ~1 it/s, GPU ~96% util
-- checkpoints: under the run dir (Lightning ModelCheckpoint)
+- train_loss decreasing: 0.727 (step 10) → 0.30 (~step 1.3K) → 0.259 (~step 2.3K)
+- throughput ~1.90 it/s (≈ 7.5 h for 50K steps), GPU ~98% util / ~30 GB
+- checkpoints: under the run dir (`checkpoints/latest/` + `checkpoints/across_timesteps/`)
+- diagnostic auto-runs on the pod when training finishes (tmux session `diag`,
+  `/workspace/diag_watcher.sh` → `/workspace/results/diag_watcher.log`)
 
 ### Anomalies / interventions
 - (none yet)

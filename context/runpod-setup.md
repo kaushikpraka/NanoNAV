@@ -1,5 +1,21 @@
 # RunPod Setup Runbook
 
+> **Realized bring-up (Run 001, 2026-06-02 — read this first).** This pod was brought up and is
+> training now. Key deviations from the steps below, learned the hard way:
+> - **Env manager is `uv`, not conda.** Once torch moved to pip wheels, conda only provided Python
+>   (slow solver + ToS friction for nothing). The env is a uv venv at **`/workspace/nanowm-venv`**
+>   (uv binary at `/workspace/uv-bin`). Activate with `source /workspace/nanowm-venv/bin/activate`.
+> - **The upstream `environment.yml` could not be installed as written** and has been repaired (now
+>   committed): `lerobot==0.3.3` (the `lerobot-datasets==2.1.0` pin was a non-existent package);
+>   `python=3.11`; torch/vision/codec `2.6.0/0.21.0/0.2.1` **+cu124**; diffusers `0.32.2`; transformers
+>   `4.46.3`; `huggingface-hub<1.0`; `setuptools<81`; **`pytorch-lightning==2.5.2`** (the code uses PL
+>   2.x APIs; the 1.9.5 pin was stale); plus a system `ffmpeg` (apt).
+> - **Launch via `scripts/run_training.sh`** (a file — multi-line shell commands get their newlines
+>   mangled in this harness, so always launch from a script): `tmux new-session -d -s train 'bash
+>   /workspace/NanoNAV/scripts/run_training.sh'`. Monitor `/workspace/results/train.log`.
+> - Dataset build: the parallel path (`--extract-frames`/`--frames-cache` + `merge_lekiwi_shards.py`)
+>   is ~6 min vs ~45–60 min sequential. See [[training-runs]] Run 001 for the full account.
+
 **Audience: a Claude session on a freshly-provisioned RunPod H100.** Your job here is one-time
 machine bring-up: install prerequisites, get the code, build the dataset, and launch training. Work
 through the steps **in order, verifying each gate before proceeding**. A bare RunPod template ships

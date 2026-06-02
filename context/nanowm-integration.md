@@ -11,8 +11,11 @@ How `kaushikpraka/wm-smallarea_merged` plugs into NanoWM
    (`src/wm_datasets/world_model_dataset.py`, the `self.action_dim` line and the
    `reshape(num_frames, frame_interval, -1).reshape(num_frames, -1)` block). Intermediate frames are
    skipped (`step=frame_interval`), so the model only predicts the chunk **endpoint**.
-2. **Version mismatch.** NanoWM pins `lerobot-datasets==2.1.0`; its loader uses the v2.x
-   `episode_data_index["from"/"to"]` API. Our dataset is **v3.0** → not loadable as-is.
+2. **Version mismatch.** NanoWM's loader uses the v2.x `episode_data_index["from"/"to"]` API, and
+   our source data is **v3.0** → not loadable as-is. (The upstream `lerobot-datasets==2.1.0` pin is a
+   *non-existent package* — "v2.1" is the LeRobot dataset *codec* version, not a release. The actual
+   installable release with the right loader is **`lerobot==0.3.3`**, the only one exposing the
+   `lerobot.datasets.lerobot_dataset` path AND `episode_data_index` AND writing CODEBASE_VERSION v2.1.)
 
 ## Decisions
 
@@ -54,3 +57,21 @@ The dataset has **no logged global pose** (`observation.state` is velocity). The
 odometry to check the SE(2) integration against → validate by visual-flow consistency (SD-VAE
 `compare` of frame *k* vs *k+f*). This revises the "verify integration vs odometry" item in
 [[open-questions]].
+
+## Realized on RunPod (Run 001, 2026-06-02)
+
+What it actually took to get this training, beyond the planned patch (all committed to the fork
+`main` + NanoNAV `main`):
+
+- **lerobot 0.3.3 builder fixes:** `add_frame(frame, task=...)` (task is a separate arg, not a frame
+  key) and tuple feature shapes (`validate_frame` compares `value.shape != declared`, so list `[2]`
+  ≠ tuple `(2,)` always fails).
+- **factory routing:** `factory.py` now routes dataset name `lekiwi` → `LeRobotDataSource` (it only
+  knew `rt1`).
+- **video backend = pyav:** `LeRobotDataSource` forces `video_backend="pyav"`; lerobot's default
+  torchcodec binds the *system* FFmpeg (4.4 on Ubuntu 22.04) and fails intermittently on AV1.
+- **action stats off the parquet:** `_load_single_trajectory` reads action/state from `hf_dataset`
+  instead of `self.dataset[i]` (which decoded a video frame per index — action stats took ~47 min;
+  now seconds).
+- **env stack:** uv venv, `pytorch-lightning==2.5.2` (code uses PL 2.x), diffusers 0.32.2,
+  transformers 4.46.3, hf-hub<1.0, torch/vision/codec +cu124. See [[runpod-setup]].

@@ -20,24 +20,31 @@ third-person camera.
 LeRobot v3.0, 9-D action = 6 arm joints + base `x.vel/y.vel/theta.vel`, cameras `front/wrist/top`).
 See [[data-collection]].
 
-## ▶️ Stage 3 — Dataset Build
+## ✅ Stage 3 — Dataset Build
 
 Turn raw episodes into NanoWM-trainable samples. Two facts shape this stage (see
 [[nanowm-integration]]): NanoWM *concatenates* per-step actions over `frame_interval` (so integration
-must be added), and it pins `lerobot-datasets==2.1.0` while our data is v3.0.
+must be added), and the loadable LeRobot release for the v2.x format is **`lerobot==0.3.3`** (the
+"v2.1" / "v3.0" in these notes is the dataset *codec* version, NOT a package version — the original
+`lerobot-datasets==2.1.0` pin was a non-existent package; see [[nanowm-integration]]).
 
 - **3a — Derived dataset** `scripts/build_lekiwi_nav_dataset.py`: v3.0 → **30 Hz LeRobot v2.1**,
   `top` camera only, 2-D base-velocity action `[x.vel, theta.vel]` (raw, integration deferred to the
-  dataloader). Output: `kaushikpraka/wm-smallarea_nav30`. **(script written; run pending)**
-- **3b — Validation:** SD-VAE `compare` of frame *k* vs *k+f* — flow direction/magnitude vs
-  `(Δx, Δθ)`. No independent odometry exists (state is velocity, not pose) → visual-flow consistency
-  only. ⬜
+  dataloader). **✅ Built to `/workspace/data/lekiwi` — 50 episodes / 44,926 frames; loads + decodes
+  in NanoWM.** Built via a parallel decode-once → sharded-encode → merge pipeline (`--extract-frames`
+  / `--frames-cache` / `--episode-slice` + `scripts/merge_lekiwi_shards.py`), ~6 min vs ~45–60 min
+  sequential; output verified byte-identical to a sequential build.
+- **3b — Validation:** load + decode + action-range sanity ✅ (vx∈[0,0.1] m/s, ω∈[−0.32,0.34] rad/s).
+  SD-VAE `compare` of frame *k* vs *k+f* (visual-flow vs `(Δx, Δθ)`) still ⬜ — no independent
+  odometry exists (state is velocity, not pose).
 
-## ⬜ Stage 4 — First Checkpoint
+## ▶️ Stage 4 — First Checkpoint
 
 NanoWM-B/2, v-prediction, additive injection, SD-VAE. Integrated `(Δx, Δθ)` action via the
 `integrate_se2` dataloader patch; `frame_interval=5` (the tunable reach knob). Trained on a single
-**RunPod H100** (eff-bs 64, ~50K steps). Babysat by a pod-side agent per [[runpod-operator-guide]].
+**RunPod H100** (eff-bs 64, ~50K steps). **Run 001 training now** (wandb run `x3ub`, ~1.9 it/s →
+~7–8 h; loss decreasing). Env is the **uv venv** with the fixed dependency stack (see
+[[runpod-setup]]). Babysat per [[runpod-operator-guide]]; logged in [[training-runs]].
 
 ## ⬜ Stage 5 — Action-Conditioning Diagnostic (Table 5/6) — **critical gate**
 
@@ -65,4 +72,6 @@ actions. See [[open-questions]].
 
 ## Current critical path
 
-3a (run preprocessing) → 3b (validate) → fork+patch+configs → 4 (train on H100) → 5 (diagnostic gate).
+✅ 3a (built) → ▶️ 4 (Run 001 training on H100, wandb `x3ub`) → 5 (action diagnostic gate, scheduled
+to auto-run on the pod when training hits ~50K steps) → 3b SD-VAE visual-flow check (can run in
+parallel) → 6 (planner).

@@ -19,8 +19,9 @@ started inside the pod and pointed at this repo. Read [[overview]], [[nanowm-int
 | Thing | Expected value |
 |---|---|
 | GPU | 1× H100 80 GB |
-| Conda env | `nanowm` (`conda activate nanowm`) |
-| NanoWM repo | the fork `KaushikTheProgrammer/nano-world-model` |
+| Python env | **uv venv** at `/workspace/nanowm-venv` (`source /workspace/nanowm-venv/bin/activate`) — not conda; see [[runpod-setup]] |
+| Launch | `tmux new-session -d -s train 'bash /workspace/NanoNAV/scripts/run_training.sh'` (launch from the script file, not inline) |
+| NanoWM repo | the fork `KaushikTheProgrammer/nano-world-model` (env + integration fixes on `main`) |
 | `RESULTS_DIR` | `/workspace/results` (checkpoints + logs, on the persistent volume) |
 | `LEKIWI_DATA_ROOT` | `/workspace/data/lekiwi` (derived v2.1 dataset, on the volume) |
 | Session multiplexer | `tmux` (training runs in a named session so SSH drops don't kill it) |
@@ -32,11 +33,12 @@ If env vars are unset, re-export them per [[runpod-setup]] (the bring-up runbook
 
 **First launch** (dataset already built into `$LEKIWI_DATA_ROOT`):
 ```bash
-tmux new -s train
-conda activate nanowm
-cd external/nanowm   # or the fork clone
-python src/main.py experiment=lekiwi_nav dataset=lerobot/lekiwi model=nanowm_b2
+# Launch from the script file (inline multi-line shell gets mangled in this harness).
+tmux new-session -d -s train 'bash /workspace/NanoNAV/scripts/run_training.sh'
+tail -f /workspace/results/train.log     # watch; expect action stats → model build → compile → steps
 ```
+`run_training.sh` activates the uv venv, exports the env contract, and runs
+`python -u src/main.py experiment=lekiwi_nav dataset=lerobot/lekiwi model=nanowm_b2`.
 **Dataset missing?** Build it once (CPU-bound, ~10–20 min) before training:
 ```bash
 python scripts/build_lekiwi_nav_dataset.py   # writes $LEKIWI_DATA_ROOT

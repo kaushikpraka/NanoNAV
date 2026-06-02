@@ -6,7 +6,13 @@ Use NanoWM (a diffusion-forcing world model) for goal-conditioned navigation on 
 
 ## Current Phase
 
-**Phase 3: Dataset Build / Training** — Teleop data already collected and merged: `kaushikpraka/wm-smallarea_merged`. Next: build training samples (SD-VAE encode + body-frame delta integration), train first NanoWM-B/2 checkpoint, run Table 5/6 diagnostic.
+**Phase 4: First Checkpoint (training in progress)** — Teleop data collected/merged
+(`kaushikpraka/wm-smallarea_merged`) and the derived v2.1 nav dataset built (50 eps / 44,926 frames →
+`/workspace/data/lekiwi`). NanoWM-B/2 **Run 001 is training now** on a RunPod H100 (wandb run `x3ub`,
+`integrate_se2`, f=5, eff-bs 64, 50K steps). Next: the Table 5/6 action-conditioning diagnostic
+(auto-scheduled on the pod at ~50K steps), then the CEM planner. The training env is a **uv venv** with
+a repaired dependency stack (the upstream `environment.yml` was unbuildable) — see [[runpod-setup]]
+and [[training-runs]] (Run 001).
 
 ## Project Tracking
 
