@@ -146,6 +146,9 @@ def build(args):
     plan = episode_plan(ep_df)
     if args.limit:
         plan = plan[: args.limit]
+    if args.episode_slice:
+        a, b = args.episode_slice
+        plan = plan[a:b]   # contiguous source-episode range, for parallel sharded builds
 
     # Sanity: frame_offset + length must stay within file & match tabular slice length.
     for r in plan:
@@ -173,12 +176,32 @@ def build(args):
         print("dry-run OK")
         return
 
+    if args.extract_frames:
+        # Phase 1 of the parallel build: decode the source ONCE and dump per-episode frames as .npy
+        # to a fast scratch dir (e.g. /dev/shm). The sharded encode then reads these via
+        # --frames-cache, so libdav1d is NOT run 25x concurrently (which oversubscribes all cores and
+        # makes the redundant decode the bottleneck). See merge_lekiwi_shards.py for the merge step.
+        outd = Path(args.extract_frames)
+        for (c, f), recs in files.items():
+            vid = video_path_for(cache, c, f)
+            for rec, i, img in iter_file_frames(vid, recs):
+                d = outd / f"ep{rec['episode']:06d}"
+                if i == 0:
+                    d.mkdir(parents=True, exist_ok=True)
+                np.save(d / f"frame_{i:06d}.npy", img)
+                if i == rec["length"] - 1:
+                    print(f"extracted ep {rec['episode']} ({rec['length']} frames)", flush=True)
+        print("extract done")
+        return
+
     from lerobot.datasets.lerobot_dataset import LeRobotDataset
 
     features = {
         CAMERA: {"dtype": "video", "shape": [480, 640, 3], "names": ["height", "width", "channel"]},
-        "action": {"dtype": "float32", "shape": [2], "names": ["x.vel", "theta.vel"]},
-        "observation.state": {"dtype": "float32", "shape": [2], "names": ["x.vel", "theta.vel"]},
+        # Shapes are tuples: lerobot 0.3.x validate_frame compares value.shape (a tuple) with `!=`
+        # against this, and a list [2] != tuple (2,) always fails. Tuples match.
+        "action": {"dtype": "float32", "shape": (2,), "names": ["x.vel", "theta.vel"]},
+        "observation.state": {"dtype": "float32", "shape": (2,), "names": ["x.vel", "theta.vel"]},
     }
     out_root = Path(args.out_root)
     ds = LeRobotDataset.create(
@@ -190,20 +213,33 @@ def build(args):
         use_videos=True,
     )
 
-    for (c, f), recs in files.items():
-        vid = video_path_for(cache, c, f)
-        acts = {r["episode"]: to_2d_action_si(A[r["data_from"]:r["data_to"]]) for r in recs}
-        for rec, i, img in iter_file_frames(vid, recs):
-            act = acts[rec["episode"]]
-            ds.add_frame({
-                CAMERA: img,                       # HWC uint8 RGB
-                "action": act[i],
-                "observation.state": act[i],       # mirror (2-D meaningful stand-in)
-                "task": rec["task"],
-            })
-            if i == rec["length"] - 1:             # episode complete
-                ds.save_episode()
-                print(f"  wrote ep {rec['episode']} ({rec['length']} frames)")
+    acts = {r["episode"]: to_2d_action_si(A[r["data_from"]:r["data_to"]]) for r in plan}
+
+    if args.frames_cache:
+        # Phase 2: read pre-decoded frames (no libdav1d) so many shards can encode in parallel.
+        fdir = Path(args.frames_cache)
+        def frame_source():
+            for r in plan:
+                for i in range(r["length"]):
+                    yield r, i, np.load(fdir / f"ep{r['episode']:06d}" / f"frame_{i:06d}.npy")
+    else:
+        def frame_source():
+            for (c, f), recs in files.items():
+                vid = video_path_for(cache, c, f)
+                for rec, i, img in iter_file_frames(vid, recs):
+                    yield rec, i, img
+
+    for rec, i, img in frame_source():
+        act = acts[rec["episode"]]
+        # lerobot 0.3.x: add_frame(frame, task, ...) — `task` is a separate arg, NOT a frame key.
+        ds.add_frame({
+            CAMERA: img,                       # HWC uint8 RGB
+            "action": act[i],
+            "observation.state": act[i],       # mirror (2-D meaningful stand-in)
+        }, task=rec["task"])
+        if i == rec["length"] - 1:             # episode complete
+            ds.save_episode()
+            print(f"  wrote ep {rec['episode']} ({rec['length']} frames)")
 
     # lerobot 2.1.x finalizes via finalize() or consolidate() depending on build.
     for closer in ("finalize", "consolidate"):
@@ -224,5 +260,11 @@ if __name__ == "__main__":
     ap.add_argument("--cache", default="data/_cache", help="source download cache")
     ap.add_argument("--push", default=None, help="HF repo id to push to (e.g. kaushikpraka/wm-smallarea_nav30)")
     ap.add_argument("--limit", type=int, default=0, help="only first N episodes (smoke test)")
+    ap.add_argument("--episode-slice", type=int, nargs=2, default=None, metavar=("START", "END"),
+                    help="build only plan[START:END] (contiguous source-episode range) for sharded builds")
+    ap.add_argument("--extract-frames", default=None, metavar="DIR",
+                    help="Phase 1: decode source once, dump per-episode frames as .npy to DIR (no lerobot)")
+    ap.add_argument("--frames-cache", default=None, metavar="DIR",
+                    help="Phase 2: read frames from DIR (.npy) instead of decoding — enables parallel sharded encode")
     ap.add_argument("--dry-run", action="store_true", help="decode+count+slice only; no lerobot write")
     build(ap.parse_args())

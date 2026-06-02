@@ -48,5 +48,41 @@ Add a new entry at the top for each run, using the template below. Keep entries 
 
 <!-- New run entries go below this line, newest first. -->
 
-_No runs recorded yet. The first entry will be the initial NanoWM-B/2 checkpoint on
-`wm-smallarea_nav30` (Stage 4 in [[roadmap]])._
+## Run 001 — 2026-06-02
+
+**Status:** running
+
+### Setup
+- NanoWM fork SHA: 41f5c0c (+ uncommitted env/integration fixes — see below)
+- NanoNAV SHA: 0e69b24 (+ uncommitted dataset-builder/script fixes)
+- Dataset: kaushikpraka/wm-smallarea_nav30 (LeRobot v2.1, 30 Hz) — built locally to
+  `/workspace/data/lekiwi`, 50 episodes / 44,926 frames. Built via a parallel decode-once +
+  sharded-encode pipeline (~6 min vs ~45–60 min sequential); shards merged + verified to load.
+- Model: nanowm_b2 (B/2, SD-VAE, v-pred, additive)
+- frame_interval: 5   action_aggregation: integrate_se2   action_dim: 2
+- Effective batch: 64   batch_size: 16   grad_accum: 4   lr: 1e-4
+- max_steps: 50000   pod: 1× H100 80 GB
+- Env: **uv venv** at `/workspace/nanowm-venv` (not conda). The upstream `environment.yml` could not
+  build as written; required fixes (now in the fork working tree): lerobot 0.3.3 (the bogus
+  `lerobot-datasets==2.1.0` pin); Python 3.11; torch/vision/codec 2.6.0/0.21.0/0.2.1 **+cu124**;
+  diffusers 0.32.2; transformers 4.46.3; huggingface-hub <1.0; **pytorch-lightning 2.5.2** (code uses
+  PL 2.x APIs; the 1.9.5 pin was stale); system ffmpeg. Plus integration fixes: factory routes
+  `lekiwi` → LeRobot loader; data source uses pyav video backend (system FFmpeg 4.4 makes torchcodec
+  flaky on AV1) and reads action/state from parquet (avoids per-frame video decode that made action
+  stats take ~47 min).
+- wandb: https://wandb.ai/kaushikpprakash-personal/nanonav/runs/x3ub
+- run dir: /workspace/results/20260602_023906-NanoWM-B-2-F4S5-lekiwi
+
+### Progress
+- integrate_se2 action stats (f=5): mean=[0.0111, -0.00029], std=[0.0071, 0.0355]
+- step ~46: train_loss 0.727 → 0.603 (decreasing), ramping toward ~1 it/s, GPU ~96% util
+- checkpoints: under the run dir (Lightning ModelCheckpoint)
+
+### Anomalies / interventions
+- (none yet)
+
+### Table 5/6 diagnostic (gate)
+- _pending — run after ~50K steps (`src/sample/action_diagnostic.py`)._
+
+### Outcome / next
+- _running; monitor per [[runpod-operator-guide]]; run the Stage-5 action diagnostic at ~50K steps._
