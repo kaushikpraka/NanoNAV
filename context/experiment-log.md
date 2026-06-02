@@ -62,7 +62,9 @@ hydra-compose, numpy-equivalence); the rest is pod-run.
   three dataset factories.
 - **Configs** (fork): `dataset/lerobot/lekiwi.yaml` + `experiment/lekiwi_nav.yaml`. Full chain
   verified by hydra-compose (integrate_se2, action_dim 2, f=5, eff-bs 64, v-pred + ZTSNR).
-- **`scripts/runpod_setup.sh`**: clone+submodule → conda env → build dataset → launch under tmux+wandb.
+- **`context/runpod-setup.md`**: bring-up runbook for the pod-side Claude (install prerequisites →
+  clone+submodule → conda env → build dataset → launch under tmux+wandb). Markdown runbook rather than
+  a rigid script, so the agent adapts to whatever the RunPod template provides.
 - **`src/sample/action_diagnostic.py`** (fork): GT/zero/random rollouts, final-latent L2,
   action-embed RMS, PASS/FAIL. Reuses `DiffusionWorldModel.rollout`.
 

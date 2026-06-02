@@ -34,5 +34,6 @@ Progress, experiments, and decisions are tracked in **git** (this repo), not Obs
 - [[open-questions]] — Unresolved items and future directions
 - [[roadmap]] — Staged execution plan with current status
 - [[nanowm-integration]] — How the dataset plugs into NanoWM (concat vs integrate, v3.0→v2.1, the patch)
+- [[runpod-setup]] — Bring-up runbook for the pod-side agent (install, clone, build, launch)
 - [[runpod-operator-guide]] — Runbook for the pod-side agent that babysits training
 - [[training-runs]] — Per-run training telemetry log

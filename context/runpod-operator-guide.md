@@ -26,7 +26,7 @@ started inside the pod and pointed at this repo. Read [[overview]], [[nanowm-int
 | Session multiplexer | `tmux` (training runs in a named session so SSH drops don't kill it) |
 | Experiment tracking | **wandb** — note the run URL in [[training-runs]] |
 
-If env vars are unset, source them from `scripts/runpod_setup.sh` in this repo.
+If env vars are unset, re-export them per [[runpod-setup]] (the bring-up runbook).
 
 ## Launch / resume
 
