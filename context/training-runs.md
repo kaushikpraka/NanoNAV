@@ -76,7 +76,10 @@ Add a new entry at the top for each run, using the template below. Keep entries 
 ### Progress
 - integrate_se2 action stats (f=5): mean=[0.0111, -0.00029], std=[0.0071, 0.0355]
 - train_loss decreasing: 0.727 (step 10) → 0.30 (~step 1.3K) → 0.259 (~step 2.3K)
-- throughput ~1.90 it/s (≈ 7.5 h for 50K steps), GPU ~98% util / ~30 GB
+- throughput ~1.90 batches/s, GPU ~98% util / ~30 GB. NOTE: max_steps=50000 is *optimizer*
+  steps and grad_accum=4, so the run is ~200K batches ≈ **~81 epochs ≈ ~24–26 h** (2,473 batches/
+  epoch ÷ 4 ≈ 618 opt-steps/epoch). The dataset is small (50 eps, overlapping stride-1 slices) — judge
+  "trained" by val_loss flattening (watch for train/val divergence = overfitting), not the step count.
 - checkpoints: under the run dir (`checkpoints/latest/` + `checkpoints/across_timesteps/`)
 - diagnostic auto-runs on the pod when training finishes (tmux session `diag`,
   `/workspace/diag_watcher.sh` → `/workspace/results/diag_watcher.log`)

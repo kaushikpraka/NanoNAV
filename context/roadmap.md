@@ -42,8 +42,9 @@ must be added), and the loadable LeRobot release for the v2.x format is **`lerob
 
 NanoWM-B/2, v-prediction, additive injection, SD-VAE. Integrated `(Δx, Δθ)` action via the
 `integrate_se2` dataloader patch; `frame_interval=5` (the tunable reach knob). Trained on a single
-**RunPod H100** (eff-bs 64, ~50K steps). **Run 001 training now** (wandb run `x3ub`, ~1.9 it/s →
-~7–8 h; loss decreasing). Env is the **uv venv** with the fixed dependency stack (see
+**RunPod H100** (eff-bs 64, 50K *optimizer* steps = grad_accum 4 × ~200K batches ≈ **~81 epochs ≈
+~24–26 h**). **Run 001 training now** (wandb run `x3ub`, loss decreasing). Env is the **uv venv** with
+the fixed dependency stack (see
 [[runpod-setup]]). Babysat per [[runpod-operator-guide]]; logged in [[training-runs]].
 
 ## ⬜ Stage 5 — Action-Conditioning Diagnostic (Table 5/6) — **critical gate**

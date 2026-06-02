@@ -91,7 +91,8 @@ realized integration summary in [[nanowm-integration]]; env reality in [[runpod-
   video backend (system FFmpeg 4.4 makes torchcodec flaky on AV1) and reads action/state from the
   parquet (the old per-frame video decode made action stats take ~47 min → now seconds).
 - **Training: Run 001 running** — NanoWM-B/2, `integrate_se2`, f=5, eff-bs 64, 50K steps, 1× H100,
-  bf16. ~1.9 it/s (~7–8 h), loss decreasing (0.73 → 0.30 by ~step 1.8K). wandb run `x3ub`.
+  bf16. ~1.9 batches/s; 50K *optimizer* steps × grad_accum 4 ≈ ~81 epochs ≈ ~24–26 h. Loss
+  decreasing (0.73 → 0.15 by epoch 6). wandb run `x3ub`.
 - **Diagnostic scheduled on the pod** (tmux `diag`): waits for training to finish, then runs
   `action_diagnostic.py` on the final checkpoint (a remote `/schedule` agent can't reach the pod's
   checkpoint/GPU).
