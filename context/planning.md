@@ -65,6 +65,23 @@ that needs **step-distillation** (DDIM→1–4) or a smaller model; real-time (1
 prototype. **6a (offline) is unaffected** — latency irrelevant; just optionally DDIM=10 to speed the
 sweep. **6b (closed-loop)** targets ~10 s/replan stop-and-plan. (The "Runtime Analysis" section below is
 the original optimistic estimate — superseded.)
+
+### Few-step sampling — DDIM=5 validated (2026-06-03); distillation NOT needed
+Cheap-settings eval on step-8000 (`results/cheap_ddim5_step8000/`) — DDIM=5 vs the DDIM-20/50 baselines on
+the planning-critical signals, **all hold:**
+| metric | baseline | DDIM=5 |
+|---|---|---|
+| gate GT / zero / random | 35.3 / 41.2 / 45.7 (DDIM20) | 33.5 / 39.8 / 44.4 |
+| gate separation (random−GT) | 10.4 | **10.8** |
+| motion trans / rot / arc latentL2 | 30.4 / 35.0 / 37.4 (DDIM50) | 28.6 / 32.5 / 36.2 |
+| controllability L-vs-R / straight-vs-stop | ~62 / ~37 (DDIM50) | ~57 / ~34 |
+
+Rollout accuracy + motion-tracking are comparable (even slightly better), action separation is preserved,
+controllability drops only ~7–8% but stays far above the ~12 noise floor. ⇒ **CEM can run at DDIM=5 with
+no meaningful quality loss — the ~10 s/replan is achievable for free, and LCM distillation is NOT
+required.** (The model's futures are low-entropy/near-deterministic, so few-step sampling captures the
+mode.) Distillation (DDIM→1–2) stays a back-pocket option only if real-time is later needed. Worth a
+DDIM=3 probe.
 - **Scoring:** latent-L2 (`objective.py`), valid **<~30 cm**; beyond that the landscape flattens → use the
   **waypoint scaffold** (Solution 1 below) for longer routes.
 
