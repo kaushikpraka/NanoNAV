@@ -76,7 +76,8 @@ it for LeKiwi**: the `envs/` dir has no LeKiwi/dataset env. Plan (eval-grounded,
 6 — Implementation Plan"):
 - **6a — offline CEM eval (next, GPU):** dataset-replay harness + `planning/lekiwi.yaml`; CEM recovers an
   action sequence to a goal frame `goal_H` chunks ahead; report goal latent-L2 + decoded planned-vs-GT
-  rollouts. No robot.
+  rollouts. No robot. **Validate planning quality at cheap sampler settings (DDIM≈5, ~32 samples)** — the
+  regime that makes 6b's ~10 s/replan viable; if few-step sampling degrades too much, distill (LCM).
 - **6b — closed-loop on LeKiwi:** real-robot env, stop-and-plan MPC, goal-image tasks.
 - **6c — long-range:** topological waypoint graph.
 

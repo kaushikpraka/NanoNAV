@@ -71,7 +71,10 @@ the original optimistic estimate — superseded.)
 ### Milestones
 - **6a — offline CEM eval (next; GPU).** Build the dataset-replay env + `lekiwi.yaml`; run
   `experiment=planning … ckpt_path=<step-8000>`; report goal-reaching latent-L2 + decoded planned-vs-GT
-  rollouts. Proves planner + WM + scoring before any hardware.
+  rollouts. Proves planner + WM + scoring before any hardware. **Crucially, validate planning quality at
+  the cheap sampler settings (DDIM≈5, ~32 samples) that make 6b's ~10 s replan viable** — 6a must confirm
+  CEM still reaches goals at them (if naive few-step sampling degrades too much, the fix is distillation —
+  see "few-step sampling" note below).
 - **6b — closed-loop on LeKiwi.** Real-robot env, stop-and-plan MPC, goal-image tasks. Needs the robot.
 - **6c — long-range.** Topological waypoint graph (Solution 1) once short-range MPC works.
 
