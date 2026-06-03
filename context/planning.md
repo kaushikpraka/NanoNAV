@@ -52,12 +52,19 @@
 | CEM replan 64×3×H3 | ~87 s | |
 
 **A default CEM replan is ~2.4 min — the old "~1 s" estimate was ~100× optimistic.** Sequential
-diffusion-forcing (3 frames/chunk × DDIM each = 60 forwards/chunk), uncompiled model, compute-bound at
-batch 64. **6a (offline) is fine** (latency irrelevant; optionally DDIM=10 to speed the sweep). **6b
-(closed-loop) requires latency work first:** `torch.compile` (~2–3×) × DDIM 20→5 (~4×) × CEM 32 samples
-/ 3 iters (~3×) × H=3 (2×) ≈ 30× → **~5 s/replan**, a workable stop-and-plan target. Real-time (167 ms)
-would need sampler distillation — not needed for the prototype. (The "Runtime Analysis" section below is
-the original, optimistic estimate — superseded by this table.)
+diffusion-forcing (3 frames/chunk × DDIM each = 60 forwards/chunk), **compute-bound at batch 64**
+(attention already uses `scaled_dot_product_attention`/flash — no structural win there).
+
+**`torch.compile` measured (default mode):** only **~1.13× at batch 64** (1.26× at batch 1) — because
+the CEM batch is compute-bound, not overhead-bound, so compile barely helps. It is NOT the big lever.
+(`reduce-overhead`/CUDA-graphs won't add much either — launch overhead is negligible at batch 64.)
+
+**The real levers reduce compute:** DDIM 20→5 (**~4×**, biggest) × 64→32 samples (**~2×**, linear when
+compute-bound) × 5→3 opt-steps (**~1.7×**) ≈ 13× (× compile 1.13× ≈ **15×**) → **~10 s/replan**. Below
+that needs **step-distillation** (DDIM→1–4) or a smaller model; real-time (167 ms) is out of reach for the
+prototype. **6a (offline) is unaffected** — latency irrelevant; just optionally DDIM=10 to speed the
+sweep. **6b (closed-loop)** targets ~10 s/replan stop-and-plan. (The "Runtime Analysis" section below is
+the original optimistic estimate — superseded.)
 - **Scoring:** latent-L2 (`objective.py`), valid **<~30 cm**; beyond that the landscape flattens → use the
   **waypoint scaffold** (Solution 1 below) for longer routes.
 
