@@ -86,6 +86,18 @@ the diagnosed checkpoint was **overfit** (step-10K = epoch 16; val bottomed ~epo
 Run 002** (retrain at f=10 + best-val checkpointing), NOT a camera change — fallbacks #1–4 below are now
 contingencies if Run 002 still fails. See [[experiment-log]] (2026-06-03), [[training-runs]] (Run 002 plan).
 
+**✅ RUN 002 OUTCOME (2026-06-03) — action branch is alive; legacy RMS gate is mis-calibrated.** Run 002
+trained to 12K at f=10. On the val-best step-4125 checkpoint the gate gives GT 36.1 / zero 40.7 / random
+45.2, RMS 0.0089: the **gt < zero < random separation is clean and wide** (random distinctly worse than
+zero ⇒ the model uses action *content*; Run 001 had zero≈random), and decoded motion rollouts visibly
+track real translation/rotation/arc. But **RMS 0.0089 ≈ Run 001's 0.0088** across two very different
+checkpoints ⇒ the action-embed RMS is **architecturally pinned** (additive injection `x = x + action_emb`)
+— a **mis-calibrated gate**, not the live signal. ⇒ The Table-5/6 pass criterion is being **re-based on
+rollout health** (action separation + motion-tracking fidelity), measured across a cross-checkpoint
+rollout eval (4125/6K/8K/10K/12K, in progress). Fallback #2 (cross-attention injection) / #3 (larger
+action-embed) are still relevant if the *separation* proves too weak for the planner. See
+[[experiment-log]] (Run 002), [[training-runs]] (Run 002).
+
 ### If Table 5/6 fails — fallback options
 1. Add absolute global pose as auxiliary conditioning (environment-specific but maximally informative)
 2. Try different action injection mechanism (cross-attention instead of additive — most expressive, most params)

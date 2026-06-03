@@ -99,11 +99,22 @@ This installs the pinned stack (`lerobot-datasets==2.1.0`, `pytorch-lightning==1
 **Gate:** `python -c "import torch; print(torch.cuda.is_available())"` → `True`; `wandb --version`
 and `huggingface-cli version` both resolve.
 
-## Step 4 — Auth (paste tokens once)
+## Step 4 — Auth (persist tokens to `/workspace`, don't rely on `wandb login`)
+
+> **Lesson from Run 002 (2026-06-03):** `wandb login` writes the key to the root-FS `~/.netrc`, which a
+> pod restart **wipes** (only `/workspace` survives) — this crashed a launch with "No API key
+> configured". Persist credentials in **`/workspace/secrets/env.sh`** instead; `scripts/run_training.sh`
+> sources it on every launch. See [[persistent-secrets]].
 
 ```bash
-huggingface-cli whoami >/dev/null 2>&1 || huggingface-cli login   # reads the source dataset
-wandb login                                                       # for run monitoring (optional)
+# One-time per token; the file persists across pod restarts.
+mkdir -p /workspace/secrets && chmod 700 /workspace/secrets
+cat >> /workspace/secrets/env.sh <<'EOF'
+export WANDB_API_KEY="<your-wandb-key>"
+export GH_TOKEN="<github-pat>"        # for git push (no gh CLI / credential helper on the pod)
+EOF
+chmod 600 /workspace/secrets/env.sh
+huggingface-cli whoami >/dev/null 2>&1 || huggingface-cli login   # only if pulling the source dataset online
 ```
 
 ## Step 5 — Build the derived dataset (skip if present)

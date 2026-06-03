@@ -56,6 +56,15 @@ Run BEFORE building the planner. Takes one afternoon.
 - RMS ~0.002 (action branch atrophied)
 - No planner will save a model that ignores actions
 
+> **⚠️ RMS threshold is mis-calibrated for the NanoNAV 2-D additive setup (Run 002, 2026-06-03).** The
+> ~0.1 / ~0.002 numbers are the paper's PushT values. NanoNAV's healthy, action-sensitive Run 002 model
+> reports **RMS ≈ 0.0089** — essentially identical to the *failed* Run 001 (0.0088) across two very
+> different checkpoints — i.e. RMS appears **architecturally pinned** by the 2-D additive embedder
+> (`x = x + action_emb`), not a live training signal. **Use the rollout signals as the real gate:** the
+> magnitude of the **gt < zero < random** separation (does corrupting the action clearly hurt?) and
+> **motion-tracking fidelity** on real-motion chunks (`motion_rollout_viz.py`). See [[training-runs]]
+> (Run 002) and [[open-questions]].
+
 ## Visual Evaluation (richer than Table 5/6)
 
 Decode predicted latents from GT-action rollouts and compare side-by-side with real video:

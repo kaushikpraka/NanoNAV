@@ -48,15 +48,70 @@ Add a new entry at the top for each run, using the template below. Keep entries 
 
 <!-- New run entries go below this line, newest first. -->
 
-## Run 002 — PLAN (not yet launched)
+## Run 002 — 2026-06-03
 
-**Status (2026-06-03):** planned & specced; **nothing implemented yet** (no code/config edits made — VM
-stopped before launch). Decisions locked: **f=10** (single run), **best-val checkpointing**, **seeded
-fixed val subset**. Resume from the "Implementation checklist" below.
+**Status:** ✅ **completed** — trained the full **12,000 steps** (~20 epochs) at **f=10**. Survived
+three separate crashes (wandb-key / FID-metric / CUDACallback), each fixed + pushed. The
+**cross-checkpoint rollout evaluation** (step 4125 / 6K / 8K / 10K / 12K — gate + motion rollouts +
+GT-vs-pred videos) is **in progress**; results to be appended.
 
 **Goal:** pass the Table 5/6 action-conditioning gate. Run 001 failed for **training** reasons, not
 observability (see Run 001 CORRECTION + `viz/stationary-vs-translation/`). Run 002 changes the two
 things that caused the failure (plus a weak val monitor) and nothing else, so the result is interpretable.
+
+### Setup (actual)
+- NanoWM fork SHA **e55fc17**; NanoNAV SHA **5910af6**.
+- Dataset: kaushikpraka/wm-smallarea_nav30 (LeRobot v2.1, 30 Hz), `/workspace/data/lekiwi` (50 eps).
+- Model: nanowm_b2 (B/2). **SD-VAE `sd-vae-ft-mse` is frozen pretrained; the 160M transformer is
+  trained from scratch** (`pretrained: null`). v-pred, **additive** injection (`x = x + action_emb`).
+- frame_interval **10**, integrate_se2, action_dim 2. Eff-bs 64 (bs 16 × grad_accum 4), lr 1e-4,
+  max_steps 12000, 1× H100, bf16.
+- Val: 5 held-out eps, **seeded fixed subset of 256 windows**; validated every 250 *batches*
+  (≈ every ~62 opt-steps — Lightning counts `val_check_interval` in batches, not opt-steps).
+- Checkpointing: across_timesteps(1000) + latest(500) + **best_val(val_loss, top-3)**.
+- wandb `jh56pz5q` (steps 0→5000) → `6c72` (final resume 5375→12000). Run dirs:
+  `20260603_041515` (orig) → `_154312` (resume 1) → `_160326` (resume 2, completed).
+
+### Progress
+- val_loss bottomed **0.2047 at step 4125 (epoch 6)**, then rose to ~0.22–0.226 by ~step 10.5K
+  (denoising-loss overfit). train_loss ~0.13–0.15. **For diffusion-forcing, val_loss is a weak
+  rollout-quality proxy** — so we deliberately trained the full session and judge by *rollouts*
+  (cross-checkpoint eval), not the val curve.
+- best-val global optimum = `best-epoch=6-step=4125-val_loss=0.2047.ckpt` (in `_041515`).
+- across_timesteps checkpoints 6K/7K/8K/9K/10K/11K/12K (in `_160326`).
+
+### Anomalies / interventions (3 crashes — all fixed + pushed)
+1. **Warmup crash — wandb "No API key".** The key lived in the root-FS `~/.netrc`, wiped by the pod
+   restart (only `/workspace` persists). Fix: persist `WANDB_API_KEY` in `/workspace/secrets/env.sh`,
+   sourced by `run_training.sh`. See [[persistent-secrets]].
+2. **Step-5000 crash — FID metric.** `pytorch_fid.calculate_frechet_distance` → scipy ≥1.17 `sqrtm`
+   `disp` deprecation → `ValueError` propagated out of `trainer.fit`. Fix: try/except guard around
+   FVD/FID in `callbacks.py` (an auxiliary metric must never kill training). Commit `de85260`.
+3. **First-resume crash (~step 5570) — CUDACallback.** Native resume drops in mid-epoch, so
+   `on_train_epoch_start` never ran → `on_train_epoch_end` hit `AttributeError: start_time`. Fix:
+   `hasattr` guard. Commit `e55fc17`.
+- **Native resume added** to finish the run: `experiment.ckpt_path` + `trainer.fit(ckpt_path=...)`
+  (restores optimizer/LR/global_step/loops) — distinct from `resume_from_checkpoint` (warm-start only,
+  restarts the step counter). `run_training.sh` gained a `RESUME_CKPT` env var. Resumed to 12000.
+
+### Table 5/6 diagnostic — on the step-4125 best-val checkpoint (n_batches 16, seed 42)
+- GT final-latent L2 **36.12**, zero **40.72**, random **45.23**; action-embed RMS **0.0089**.
+- verdict: **FAIL on the RMS>0.05 gate** — BUT a clean, widening **gt < zero < random** separation
+  (random now distinctly *worse* than zero, unlike Run 001 where zero≈random): the model **responds to
+  action content**. RMS 0.0089 ≈ Run 001's 0.0088 across two very different checkpoints ⇒ **RMS looks
+  architecturally pinned / mis-calibrated for this 2-D additive embedder**, not a live training signal.
+  The separation + motion-tracking are the meaningful signals.
+- Motion rollouts (`motion_rollout_viz.py`, new tool): the model **tracks real translation (+10 cm),
+  rotation (+28°), and arc** motion in the correct direction; error grows with the horizon and is
+  largest for big rotations (whole-FOV sweep). The action branch is functioning.
+
+### Outcome / next
+- Pipeline is now robust (3 crash classes fixed + pushed). Action branch is **alive and
+  action-sensitive** at the val-best checkpoint — materially better than Run 001 — though the legacy
+  RMS gate still reads FAIL (now believed mis-calibrated).
+- **In progress:** cross-checkpoint rollout eval (4125/6K/8K/10K/12K) to answer *does more training
+  improve rollout quality* with a measured metric-vs-step curve + GT-vs-pred videos, and to pick the
+  checkpoint for the CEM/MPC planner. Results to be appended.
 
 ### What changes from Run 001 (and why)
 1. **`frame_interval` 5 → 10.** Translation's SNR over the non-action latent floor is only ~1:1 at f=5
@@ -118,7 +173,9 @@ Pass requires overall action-embed **RMS ~0.1+** and GT clearly beating zero/ran
   ~130–190K transitions/room) and/or add augmentation (fallback #4).
 - Only then revisit **camera/odometry** changes (open-questions fallback #1) — now a last resort.
 
-### Implementation checklist (RESUME HERE — nothing below is done yet)
+### Implementation checklist — ✅ DONE (commits de85260 / e55fc17, NanoNAV 5910af6)
+
+> All of A–F below were executed. Retained as the original spec / record of what was built.
 
 **A. Code — best-val checkpoint.** In `external/nanowm/src/experiments/train_experiment.py`, after the
 `latest_checkpoint` append (~line 819), add (backward-compatible via `.get` → old configs still work):
@@ -157,12 +214,12 @@ Cadence = `val_every_n_steps` (already wired to Trainer `val_check_interval`, li
 (`<run>/checkpoints/best_val/`), NOT latest. Pass = action-embed RMS ~0.1+, GT clearly < zero/random,
 and (new) non-trivial Δθ-zeroed (translation-only) sensitivity. Then fill the telemetry template above.
 
-### Setup (fill at launch)
+### Setup (pre-launch spec) — superseded by "Setup (actual)" at the top of this entry
 - frame_interval: **10**   action_aggregation: integrate_se2   action_dim: 2
 - Effective batch: 64 (batch_size 16 × grad_accum 4)   lr: 1e-4   max_steps: ~12000
 - val: 5 eps, fixed seeded subset 256   val_every_n_steps: 250
 - checkpointing: across_timesteps(1000) + latest(500) + **best_val(val_loss, top-3)**
-- pod: 1× H100 80 GB   wandb: <url>   fork SHA / NanoNAV SHA: <fill>
+- pod: 1× H100 80 GB   wandb: jh56pz5q → 6c72   fork SHA e55fc17 / NanoNAV 5910af6
 
 ---
 

@@ -46,23 +46,25 @@ NanoWM-B/2, v-prediction, additive injection, SD-VAE. Integrated `(Δx, Δθ)` a
 **overfit by epoch ~3** (50 episodes is tiny for B/2; 50K steps = ~81 epochs, and the config saved no
 best-val checkpoint) and was stopped at ~23K steps. See [[runpod-setup]], [[training-runs]].
 
-## ❌ Stage 5 — Action-Conditioning Diagnostic (Table 5/6) — **FAILED on Run 001 (training cause, retry as Run 002)**
+## ▶️ Stage 5 — Action-Conditioning Diagnostic (Table 5/6) — **Run 002 trained; action branch alive, re-gating via rollouts**
 
 `action_diagnostic.py` (GT / zero / random rollouts): GT latent-L2 must clearly beat zero/random and
-action-embedding RMS must be ~0.1+. **Run 001 (step-10K ckpt): FAIL** — RMS **0.0088**, GT 37.8 vs
-zero 42.0 / random 42.4.
+action-embedding RMS must be ~0.1+. **Run 001 (overfit f=5 step-10K): FAIL** — RMS **0.0088**, GT 37.8
+vs zero 42.0 / random 42.4 (zero≈random ⇒ action ignored).
 
-**Root cause CORRECTED (2026-06-03): a TRAINING problem, not observability.** A controlled
-stationary-vs-translation latent contrast (`stationary_vs_translation.py`,
-`viz/stationary-vs-translation/`) shows **translation IS observable** — pure-translation chunks change
-the SD-VAE latent ~2× more than stationary ones (AUC 0.94 @ f=5 → 0.98 @ f=10), with a clean
-dose-response and a near-field-floor parallax footprint. The earlier `corr(|Δx|, latentL2)≈0` (and the
-2026-06-02 "translation unobservable / f refuted" conclusion) was an artifact of bang-bang Δx + pooled
-rotation chunks. ⇒ The diagnosed checkpoint was simply **overfit** (step-10K = epoch 16; val bottomed
-~epoch 3, no best-val ckpt kept) **at a low-SNR f=5** (translation ≈ noise floor). **Fix = Run 002**
-(retrain at **f=10**, best-val checkpointing, low `max_steps`; re-diagnose the best-val model). Camera
-relocation / odometry conditioning is demoted to a fallback. See [[training-runs]] (Run 002 plan),
-[[open-questions]], [[experiment-log]].
+**Run 002 (f=10, trained to 12K, gate on the best-val step-4125 ckpt):** GT **36.1**, zero **40.7**,
+random **45.2**, RMS **0.0089**. The legacy RMS gate still reads **FAIL**, but the rollout signal is
+**materially healthier**: a clean, widening **gt < zero < random** separation (random now distinctly
+worse than zero — the model uses action *content*), and motion rollouts visibly track real
+translation/rotation/arc. The RMS being ~identical to Run 001 across two very different checkpoints ⇒
+**RMS is mis-calibrated / architecturally pinned** for the 2-D additive embedder, not a live signal —
+the separation + motion-tracking are the meaningful gate. (Earlier "translation unobservable" claim was
+refuted: translation IS observable, `viz/stationary-vs-translation/`; the camera was never the problem.)
+
+**In progress:** a **cross-checkpoint rollout eval** (step 4125 / 6K / 8K / 10K / 12K — gate + motion
+rollouts + GT-vs-pred videos, all seeded) to (a) confirm action-grounding strengthens (or at least
+holds) with training, (b) answer *does more training improve rollout quality*, and (c) pick the
+checkpoint to carry into Stage 6. See [[training-runs]] (Run 002), [[open-questions]], [[experiment-log]].
 
 ## ⬜ Stage 6 — Short-Range Planner (CEM/MPC)
 
@@ -84,10 +86,10 @@ actions. See [[open-questions]].
 
 ## Current critical path
 
-✅ 3a (built) → ✅ 4 (Run 001 trained, overfit) → ❌ 5 (diagnostic FAILED on an **overfit f=5**
-checkpoint — *not* an observability problem; translation is observable, see
-`viz/stationary-vs-translation/`) → **▶️ Run 002: retrain at f=10 with best-val checkpointing + low
-max_steps, then re-run the diagnostic on the best-val model (+ per-component Δx/Δθ sensitivity)** →
-(gate must pass before) 6 (planner). The diagnostic FAIL is the current blocker; do not build the
-planner until the action branch is healthy (RMS ~0.1+). Camera relocation / odometry conditioning is a
-**fallback** if Run 002 still fails, no longer the primary plan.
+✅ 3a (built) → ✅ 4 (Run 001 trained, overfit f=5) → ✅ **Run 002 trained to 12K at f=10**
+(best-val checkpointing; 3 crashes fixed + pushed) → **▶️ 5: re-gating via rollouts** — the action
+branch is now alive/action-sensitive (clean gt<zero<random + visible motion tracking), the legacy RMS
+gate reads FAIL but is judged mis-calibrated; a **cross-checkpoint rollout eval (4125/6K/8K/10K/12K)**
+is running to pick the checkpoint → (then) 6 (planner). Decision gate for the planner is now
+**rollout health** (action separation + motion-tracking fidelity), not the RMS number. Camera
+relocation / odometry conditioning remains a **fallback** only if rollouts prove inadequate.

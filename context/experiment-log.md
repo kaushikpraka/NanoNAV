@@ -205,3 +205,42 @@ under overfitting — at f=8–10 it's 1.3–1.6× the floor and far more learna
 ⇒ Next is **Run 002, not a camera change**: retrain at **f=10**, add a **best-val checkpoint** + low
 `max_steps` so the diagnostic runs on the *best-val* model, and extend the action diagnostic to report
 **per-component** (Δx-only vs Δθ-only) sensitivity. See [[roadmap]] and [[training-runs]] (Run 002 plan).
+
+## 2026-06-03 — Run 002 (f=10) trained to completion: action branch alive, RMS gate looks mis-calibrated
+
+Executed the Run 002 plan: NanoWM-B/2 trained to the full **12,000 steps at f=10** with best-val
+checkpointing on one H100. Operational detail + telemetry in [[training-runs]] (Run 002).
+
+**Three crashes, each fixed + pushed** (the run is now reproducible):
+- **wandb "No API key"** in warmup — the key lived in the root-FS `~/.netrc`, wiped by the pod restart
+  (only `/workspace` persists). Fix: persist `WANDB_API_KEY` in `/workspace/secrets/env.sh`, sourced by
+  `run_training.sh`. See [[persistent-secrets]].
+- **FID metric at step 5000** — `pytorch_fid` → scipy ≥1.17 `sqrtm` `disp` deprecation → `ValueError`
+  propagated out of `trainer.fit`. Fix: try/except guard around FVD/FID in `callbacks.py` (an auxiliary
+  metric must never kill training).
+- **CUDACallback at the first resume's epoch boundary** — native (`ckpt_path`) resume drops in
+  mid-epoch, so `on_train_epoch_start` never ran → `on_train_epoch_end` hit `AttributeError:
+  start_time`. Fix: `hasattr` guard. Also added **native Lightning resume** (`experiment.ckpt_path` +
+  `trainer.fit(ckpt_path=...)`) to finish the run — distinct from the warm-start `resume_from_checkpoint`.
+
+**Result — the action branch is alive and action-sensitive (much better than Run 001), but the RMS gate
+mis-reads.** On the val-best step-4125 checkpoint: GT 36.1 / zero 40.7 / random 45.2, RMS 0.0089.
+- The **gt < zero < random separation is clean and wide** — random is distinctly worse than zero, so the
+  model uses action *content*. Run 001 had zero≈random (action ignored). Decoded **motion rollouts**
+  (`motion_rollout_viz.py`, new — scans the val set for high-motion chunks) show the model tracks real
+  translation (+10 cm), rotation (+28°) and arc motion in the right direction, error growing over the
+  horizon (largest for big rotations — whole-FOV sweep).
+- **RMS 0.0089 ≈ Run 001's 0.0088** across two very different checkpoints ⇒ the action-embed RMS looks
+  **architecturally pinned** (injection is additive, `x = x + action_emb`) — a **mis-calibrated gate**,
+  not a live signal. The separation + motion-tracking are the metrics that actually move.
+
+**Methodology note (diffusion-forcing):** val_loss bottomed 0.2047 at step 4125 then rose, but the
+denoising val_loss is a weak proxy for rollout quality — so we trained the *full* session (not
+early-stopped on val) and judge by rollouts. **In progress:** a seeded **cross-checkpoint rollout eval**
+(4125 / 6K / 8K / 10K / 12K — gate + motion + GT-vs-pred videos) to measure whether more training
+improves rollouts and pick the planner checkpoint.
+
+**Architecture clarification:** the SD-VAE perception (`sd-vae-ft-mse`) is **frozen pretrained**; the
+160M transformer is trained **from scratch** (`pretrained: null`). So this is a scene-specific dynamics
+model on a general perceptual backbone — it generalizes to novel trajectories/goals *within* the trained
+room, not across environments (single-room scope; see [[open-questions]]).

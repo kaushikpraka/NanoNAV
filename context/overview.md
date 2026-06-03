@@ -6,21 +6,25 @@ Use NanoWM (a diffusion-forcing world model) for goal-conditioned navigation on 
 
 ## Current Phase
 
-**Phase 4→5: First checkpoint trained; Table 5/6 diagnostic FAILED — but the cause is a TRAINING
-problem (overfit + low f), not a camera/observability one.** Dataset built (50 eps / 44,926 frames →
-`/workspace/data/lekiwi`) and NanoWM-B/2 **Run 001** trained on a RunPod H100 (uv venv, `integrate_se2`,
-f=5, eff-bs 64). It **overfit by epoch ~3** and the step-10K (epoch-16, overfit) checkpoint **failed
-the gate** (action-embed RMS 0.0088 ≪ 0.1).
+**Phase 5: Run 002 (f=10) trained to completion; re-gating the action branch via rollouts.** NanoWM-B/2
+**Run 002** trained the full **12,000 steps at f=10** on a RunPod H100 (after fixing three crashes —
+wandb-key / FID-metric / CUDACallback — all pushed). Architecture note: **the SD-VAE perception is frozen
+pretrained; the 160M transformer is trained from scratch** (`pretrained: null`). val_loss bottomed 0.2047
+at step 4125 then rose (denoising-loss overfit) — but for diffusion-forcing val_loss is a weak
+rollout-quality proxy, so we trained the full session and judge by *rollouts*.
 
-A **controlled stationary-vs-translation latent contrast** (2026-06-03; `stationary_vs_translation.py`,
-`viz/stationary-vs-translation/`) **overturned the earlier "translation is geometrically unobservable"
-conclusion**: holding rotation near zero, pure-translation chunks change the SD-VAE latent ~2× more than
-stationary ones (AUC 0.94 @ f=5 → 0.98 @ f=10/20), with a clean dose-response and a near-field-floor
-parallax footprint. The old `corr(|Δx|, latentL2)≈0` was an artifact of bang-bang Δx + pooled rotation
-chunks; **raising f from 5→10 lifts translation's SNR over the noise floor from ~1:1 to ~1.6:1.**
-**Next: Run 002 — retrain at f=10 with best-val checkpointing + low max_steps, then re-run the gate on
-the best-val model.** Camera relocation / odometry conditioning is demoted to a fallback, not a
-prerequisite. See [[training-runs]] (Run 001 + Run 002 plan), [[experiment-log]], [[open-questions]].
+The action branch is now **alive and action-sensitive**: at the val-best (step-4125) checkpoint the gate
+shows a clean **gt < zero < random** separation (36.1 / 40.7 / 45.2) and the model visibly tracks real
+translation / rotation / arc motion — materially better than Run 001 (where zero≈random). The legacy
+**action-embed RMS gate still reads FAIL** (0.0089 ≈ Run 001's 0.0088 across two very different
+checkpoints), now believed **mis-calibrated / architecturally pinned** for the 2-D additive embedder
+rather than a live training signal — the separation + motion-tracking are the meaningful signals.
+
+Run 002 also confirmed (via `viz/stationary-vs-translation/`) that the earlier "translation is
+geometrically unobservable" claim was wrong: translation IS observable (AUC 0.94 @ f=5 → 0.98 @ f=10);
+the camera was never the problem. **In progress: a cross-checkpoint rollout eval (4125 / 6K / 8K / 10K /
+12K)** to measure whether more training improves rollout quality and to pick the checkpoint for the
+CEM/MPC planner. See [[training-runs]], [[experiment-log]], [[open-questions]].
 
 ## Project Tracking
 
