@@ -94,7 +94,10 @@ it for LeKiwi**: the `envs/` dir has no LeKiwi/dataset env. Plan (eval-grounded,
   rollouts (needs a small backward-compat `CEMPlanner` patch to surface elites). Sub-steps 6b.0
   transport+units → 6b.1 open-loop replay →
   6b.2 shared engine module → 6b.3 closed-loop → 6b.4 goal capture → 6b.5 telemetry. Top trap: `theta.vel`
-  deg/s↔rad/s (57× scale). Full spec in [[planning]] "6b — Closed-Loop MPC on LeKiwi".
+  deg/s↔rad/s (57× scale). **Develop locally for free** (all authoring + the no-model robot checks 6b.0/6b.1
+  with the Mac as lerobot client on the LAN, stub-planner end-to-end test); **resume on the pod only for live
+  CEM inference** (swap stub→real WM, Mac/LAN→RunPod/Tailscale — a config swap, not a rewrite). Full spec in
+  [[planning]] "6b — Closed-Loop MPC on LeKiwi".
 - **6c — long-range:** topological waypoint graph.
 
 Params from the evals: **step-8000**, **H = 3–5 chunks** (reliable rollout window; at f=10 → ~10–17 cm

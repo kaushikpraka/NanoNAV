@@ -310,12 +310,30 @@ touches the robot):**
 
 | # | step | proves | new code |
 |---|---|---|---|
-| **6b.0** | **Transport + units bring-up** (no planning) | Tailscale up; RunPod `LeKiwiClient` ↔ Pi host; `get_observation()` returns a decodable `top` frame; `send_action()` drives the base; RTT measured; **sign/units of `x.vel` & `theta.vel` confirmed empirically** | tiny smoke script |
+| **6b.0** | **Transport + units bring-up** (no planning) | lerobot client ↔ Pi host (**Mac/local-LAN to dev; RunPod/Tailscale on the pod**); `get_observation()` returns a decodable `top` frame; `send_action()` drives the base; RTT measured; **sign/units of `x.vel` & `theta.vel` confirmed empirically** | tiny smoke script |
 | **6b.1** | **Open-loop replay** (velocity conversion, no CEM) | replay a recorded val episode's GT `(Δx,Δθ)` chunks → velocities → execute; eyeball it traces the recorded path (translation + a turn) | `replay_chunks.py` |
 | **6b.2** | **Engine module** | factor 6a's load + `DiffusionWorldModel` + `CEMPlanner` + action-stat helpers into one importable module so the live loop runs the *exact* validated path (no eval-vs-robot drift) | refactor of `offline_planning_eval.py` core |
 | **6b.3** | **Closed-loop MPC** | the stop-and-plan loop above; terminate on latent threshold or max_steps; per-step logging | `lekiwi_mpc.py` |
 | **6b.4** | **Goal capture + run harness** | `capture_goal.py` (drive-and-snapshot the `top` frame to a goal file; pre-staged photos use the same file interface) + run wrapper | `capture_goal.py` |
 | **6b.5** | **Telemetry (rerun) + success criteria** | per-step montage (live frame · goal · winning rollout · **the selected top-K elite rollouts**) + latent-distance-descent curve; success = robot visibly arrives within max_steps on ≥3 short tasks | rerun viz + small `CEMPlanner` elite-surfacing patch |
+
+**Develop locally (free), run inference on the pod.** The GPU/cost boundary falls between authoring + the
+no-model robot checks (local, free) and live CEM (pod) — so the pod only spins up for inference:
+- **Local (Mac, no GPU, no pod, no Tailscale):** all *authoring* — 6b.2 engine module, 6b.3 loop, 6b.4
+  capture, 6b.5 viz, the `CEMPlanner` elite patch — **plus the robot-grounded checks that need no model**,
+  6b.0 transport+units and 6b.1 open-loop replay, run with the **Mac as the lerobot client on the local LAN**
+  (the existing teleop path; no Tailscale needed). These are the highest-risk sim-to-real checks (the
+  `theta.vel` deg/s↔rad/s trap, the velocity math) and they cost nothing. Exercise the full
+  control/viz/termination path end-to-end on CPU with a **stub planner** (canned action sequences) + mock
+  latents, so everything but live CEM is validated locally.
+- **Pod (H100, GPU-only — resume here):** the live closed-loop run. Swap stub→real `DiffusionWorldModel`,
+  and swap Mac-client/local-LAN → **RunPod-client/Tailscale** (the Tailscale setup is part of resuming on the
+  pod). Run 6b.3 at DDIM=3 (~7 s/replan) + the elite-rollout decode viz with real latents.
+- **Make the swap a config change, not a rewrite:** inject the **planner** (real CEM vs stub) and the
+  **robot client** (same `LeKiwiClient`, different endpoint — LAN IP vs tailnet IP) as dependencies. Then
+  "resume on the pod" = flip the device string, the endpoint, and the planner impl; the loop, velocity math,
+  clamps, termination, and rerun logging are identical and already validated locally. (Model + dataset pull
+  from the HF backups on the pod — see 6a "Develop vs run".)
 
 **Goal spec:** real in-distribution `top` frames — **drive-and-snapshot** (teleop to the spot, capture the
 `top` frame, drive back to a start pose, run) and/or **pre-staged photos** from the same camera/mount/
