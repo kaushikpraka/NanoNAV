@@ -35,6 +35,7 @@ Ctrl-C sends zero + disconnects.
 """
 
 import argparse
+import json
 import signal
 import sys
 from math import pi
@@ -235,13 +236,17 @@ def plot_paths(cmds, raw_steps, out_png, title):
 
 def main():
     ap = argparse.ArgumentParser(description="LeKiwi 6b.1 open-loop replay")
-    ap.add_argument("--source", choices=["synthetic", "dataset"], default="synthetic")
+    ap.add_argument("--source", choices=["synthetic", "dataset", "file"], default="synthetic")
     ap.add_argument("--pattern", default="square",
                     help="synthetic: forward|pivot_left|pivot_right|arc_left|arc_right|square")
     ap.add_argument("--k", type=int, default=5, help="synthetic: forward/turn chunks per leg")
     # dataset source
     ap.add_argument("--repo-id", default="kaushikpraka/wm-smallarea_nav30")
     ap.add_argument("--root", default=None, help="local dataset root (else lerobot cache/HF)")
+    # file source (decouple dataset-read from robot-drive): read chunks where the data lives,
+    # export the JSON, then --source file --commands <json> --execute on the Mac (no dataset needed).
+    ap.add_argument("--commands", default=None, help="--source file: chunk JSON written by --export-commands")
+    ap.add_argument("--export-commands", default=None, help="write the chunk sequence to this JSON")
     ap.add_argument("--episode", type=int, default=0)
     ap.add_argument("--start", type=int, default=0, help="frame offset within the episode")
     ap.add_argument("--chunks", type=int, default=12, help="dataset: number of chunks to replay")
@@ -262,15 +267,35 @@ def main():
     if args.source == "synthetic":
         chunks, raw = synth_chunks(args.pattern, args.k)
         title = f"6b.1 synthetic:{args.pattern} (k={args.k})"
-    else:
+        tag = args.pattern
+    elif args.source == "dataset":
         chunks, raw = dataset_chunks(args.repo_id, args.root, args.episode, args.start, args.chunks, args.f)
         title = f"6b.1 dataset ep{args.episode}+{args.start} ({len(chunks)} chunks, f={args.f})"
+        tag = f"ep{args.episode}"
+    else:  # file — chunks precomputed where the dataset reads cleanly (e.g. the pod)
+        if not args.commands:
+            raise SystemExit("--source file needs --commands <json>")
+        with open(args.commands) as fp:
+            blob = json.load(fp)
+        chunks = [tuple(c) for c in blob["chunks"]]
+        raw = None
+        title = blob.get("title", f"6b.1 file:{Path(args.commands).stem}")
+        tag = Path(args.commands).stem
+        if abs(blob.get("chunk_dt", lk.CHUNK_DT) - lk.CHUNK_DT) > 1e-6:
+            print(f"[warn] exported chunk_dt {blob['chunk_dt']} != current {lk.CHUNK_DT}")
     print(f"[plan] {title}: {len(chunks)} chunks × {lk.CHUNK_DT:.3f}s ≈ {len(chunks)*lk.CHUNK_DT:.1f}s of motion")
 
     cmds = cmd_table(chunks)
     out = Path(args.out)
-    tag = args.pattern if args.source == "synthetic" else f"ep{args.episode}"
     extent = plot_paths(cmds, raw, out / f"{args.source}_{tag}.png", title)
+
+    if args.export_commands:
+        Path(args.export_commands).parent.mkdir(parents=True, exist_ok=True)
+        with open(args.export_commands, "w") as fp:
+            json.dump({"chunk_dt": lk.CHUNK_DT, "title": title,
+                       "chunks": [[float(dx), float(dth)] for dx, dth in chunks]}, fp, indent=2)
+        print(f"[export] {len(chunks)} chunks → {args.export_commands}  "
+              f"(copy to the Mac, run: --source file --commands {Path(args.export_commands).name} --execute)")
 
     if args.save_frames and args.source == "dataset":
         save_recorded_frames(args.repo_id, args.root, args.episode, args.start,
