@@ -94,9 +94,18 @@ track real translation/rotation/arc. But **RMS 0.0089 ≈ Run 001's 0.0088** acr
 checkpoints ⇒ the action-embed RMS is **architecturally pinned** (additive injection `x = x + action_emb`)
 — a **mis-calibrated gate**, not the live signal. ⇒ The Table-5/6 pass criterion is being **re-based on
 rollout health** (action separation + motion-tracking fidelity), measured across a cross-checkpoint
-rollout eval (4125/6K/8K/10K/12K, in progress). Fallback #2 (cross-attention injection) / #3 (larger
+rollout eval (4125/6K/8K/10K/12K). Fallback #2 (cross-attention injection) / #3 (larger
 action-embed) are still relevant if the *separation* proves too weak for the planner. See
 [[experiment-log]] (Run 002), [[training-runs]] (Run 002).
+
+**✅ RESOLVED (2026-06-04) — the action branch is strong enough for planning; no fallback needed.** The
+cross-checkpoint rollout eval finished: rollout quality is **U-shaped, peaks ~6K–8K then overfits ⇒
+step-8000**. Then **Stage 6a (offline CEM planning eval) confirmed the separation is sufficient for the
+planner directly**: on step-8000, CEM inverts the world model to **near-WM-optimal** action sequences
+(`cem_reached/gt_ceiling` ~1.0–1.1) in *every* motion bucket and recovers the true commands (sign 100%,
+dxErr ~1 cm, dθErr ~2.5°). So the worry "if the separation proves too weak for the planner" is **answered
+empirically — it isn't**; fallbacks #1–4 are now dead unless 6b (closed-loop) regresses. The
+mis-calibrated RMS gate is moot. See [[planning]] "6a — RESULTS", [[experiment-log]] (2026-06-04).
 
 ### If Table 5/6 fails — fallback options
 1. Add absolute global pose as auxiliary conditioning (environment-specific but maximally informative)

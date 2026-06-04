@@ -6,25 +6,25 @@ Use NanoWM (a diffusion-forcing world model) for goal-conditioned navigation on 
 
 ## Current Phase
 
-**Phase 5: Run 002 (f=10) trained to completion; re-gating the action branch via rollouts.** NanoWM-B/2
-**Run 002** trained the full **12,000 steps at f=10** on a RunPod H100 (after fixing three crashes —
-wandb-key / FID-metric / CUDACallback — all pushed). Architecture note: **the SD-VAE perception is frozen
-pretrained; the 160M transformer is trained from scratch** (`pretrained: null`). val_loss bottomed 0.2047
-at step 4125 then rose (denoising-loss overfit) — but for diffusion-forcing val_loss is a weak
-rollout-quality proxy, so we trained the full session and judge by *rollouts*.
+**Phase 6: Stage 6a (offline CEM planning eval) PASSED — planner engine validated, 6b (closed-loop on
+LeKiwi) green-lit.** The CEM/MPC planner + NanoWM + latent-L2 scoring were run end-to-end on **step-8000**
+over **35 held-out val scenes stratified by motion** (translation/pivot/arc/slow), swept over DDIM {20,5,3}.
+**All four acceptance gates pass:** CEM beats the no-move floor 100% of scenes and lands **near-WM-optimal**
+(`cem_reached/gt_ceiling` ~1.0–1.1) in *every* motion bucket; it recovers the true commands (turn/forward
+sign 100%, dxErr ~1 cm, dθErr ~2.5°); decoded montages land on the goal; and the cheap **DDIM=3** regime
+holds with **no pivot collapse** (~7 s/replan confirmed for 6b). The residual goal gap is WM prediction
+error, not planner failure. Open-loop accuracy only — closed-loop success is 6b (needs the robot). See
+[[planning]] "6a — RESULTS", [[roadmap]], `results/offline_planning_step8000/`.
 
-The action branch is now **alive and action-sensitive**: at the val-best (step-4125) checkpoint the gate
-shows a clean **gt < zero < random** separation (36.1 / 40.7 / 45.2) and the model visibly tracks real
-translation / rotation / arc motion — materially better than Run 001 (where zero≈random). The legacy
-**action-embed RMS gate still reads FAIL** (0.0089 ≈ Run 001's 0.0088 across two very different
-checkpoints), now believed **mis-calibrated / architecturally pinned** for the 2-D additive embedder
-rather than a live training signal — the separation + motion-tracking are the meaningful signals.
-
-Run 002 also confirmed (via `viz/stationary-vs-translation/`) that the earlier "translation is
-geometrically unobservable" claim was wrong: translation IS observable (AUC 0.94 @ f=5 → 0.98 @ f=10);
-the camera was never the problem. **In progress: a cross-checkpoint rollout eval (4125 / 6K / 8K / 10K /
-12K)** to measure whether more training improves rollout quality and to pick the checkpoint for the
-CEM/MPC planner. See [[training-runs]], [[experiment-log]], [[open-questions]].
+**How we got here (Run 002 → step-8000).** NanoWM-B/2 Run 002 trained the full **12,000 steps at f=10** on
+a RunPod H100 (after fixing three crashes — wandb-key / FID-metric / CUDACallback). Architecture note: **the
+SD-VAE perception is frozen pretrained; the 160M transformer is trained from scratch** (`pretrained: null`).
+For diffusion-forcing val_loss is a weak rollout proxy (it bottomed at step-4125 then rose), so checkpoints
+were judged by *rollouts*: the action branch is **alive and action-sensitive** (clean **gt < zero < random**
+separation + visible translation/rotation/arc tracking; the legacy action-embed RMS gate reads FAIL but is
+**mis-calibrated / architecturally pinned** for the 2-D additive embedder). The **cross-checkpoint rollout
+eval** found rollout quality is **U-shaped — peaks at ~6K–8K then overfits** ⇒ **step-8000 is the planner
+checkpoint**. See [[training-runs]], [[experiment-log]], [[open-questions]].
 
 ## Project Tracking
 
