@@ -91,8 +91,9 @@ it for LeKiwi**: the `envs/` dir has no LeKiwi/dataset env. Plan (eval-grounded,
   inference API). Stop-and-plan MPC wraps the 6a-validated engine (step-8000, DDIM=3, 32×3, H=3,
   replan-every-chunk); goals are real `top` frames (drive-and-snapshot / pre-staged); live telemetry via
   **rerun-over-Tailscale** to the Mac viewer, rendering the winning **and the selected top-K elite** WM
-  rollouts (needs a small backward-compat `CEMPlanner` patch to surface elites). Sub-steps 6b.0
-  transport+units → 6b.1 open-loop replay →
+  rollouts (needs a small backward-compat `CEMPlanner` patch to surface elites). Sub-steps **6b.0
+  transport+units ✅ DONE** (Pi 10.0.0.125: RTT ~15 ms; `x.vel` m/s +fwd; `theta.vel` deg/s +CCW = no sign
+  flip, convert ω×57.3; low-speed turn deadband noted) → 6b.1 open-loop replay →
   6b.2 shared engine module → 6b.3 closed-loop → 6b.4 goal capture → 6b.5 telemetry. Top trap: `theta.vel`
   deg/s↔rad/s (57× scale). **Develop locally for free** (all authoring + the no-model robot checks 6b.0/6b.1
   with the Mac as lerobot client on the LAN, stub-planner end-to-end test); **resume on the pod only for live

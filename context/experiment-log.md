@@ -291,3 +291,37 @@ sampling choice; and these are **open-loop** numbers on reachable dataset goals 
 (`offline_planning_eval.json` per-scene rows + aggregates, `montages/`, `run.log`). Detail + full table in
 [[planning]] "6a — RESULTS". **Stage 6a passes; the planner engine is validated; 6b (closed-loop on LeKiwi)
 is green-lit.**
+
+## 2026-06-04 — Stage 6b.0: LeKiwi transport + units bring-up — PASS (the (Δx,Δθ)→velocity contract is pinned)
+
+Ran `scripts/lekiwi_transport_check.py` (Mac as lerobot `LeKiwiClient`, local LAN, no GPU/WM) against the Pi
+host at **10.0.0.125** — connect/contract/frame/RTT, then a wheels-up pass and a decisive **on-ground** pass.
+**All checks pass; the robot-facing contract the live controller depends on is now empirically confirmed:**
+
+- **Transport:** `LeKiwiClient(remote_ip=10.0.0.125, id=lekiwi)` connects over ZMQ; **import path
+  `lerobot.robots.lekiwi`**. `get_observation()` RTT **~14–16 ms** (p95 < 22 ms) — network is a non-issue for
+  stop-and-plan.
+- **Contract:** action = 6 arm `.pos` + `x.vel` / `y.vel` / `theta.vel`; observation adds cameras
+  `front` / `wrist` / **`top`** (bare key, **480×640×3 uint8**, matches the dataset's native res). Controller
+  holds the 6 arm `.pos` at their observed values every step; `y.vel`=0 (strafe unused).
+- **`x.vel` = m/s, `+x` = FORWARD** (commanded +0.05 → drove forward, readback 0.0465). → `x.vel = Δx/(f·Δt)`,
+  no conversion.
+- **`theta.vel` = DEG/S, `+theta` = LEFT/CCW** (commanded +15 deg/s → body turned CCW, readback 13.48). The
+  WM's ω is rad/s (the build script converted deg/s→rad/s for training), so the controller **must convert**
+  `theta.vel = (Δθ/(f·Δt))·(180/π)`. Sign **matches** the dataset (unicycle `+ω = CCW`) → **no negation**.
+  Units confirmed two ways: the dataset build established raw deg/s, and a `12 deg/s` command read back a tidy
+  `11.13` (rad/s would mean ~690°/s — motors would saturate, not report ~12).
+- **`f·Δt = 10/30 = 0.333 s`** (the Run-002 chunk). So: `x.vel = Δx/0.333`; `theta.vel = (Δθ/0.333)·57.296`.
+- **Low-speed rotation deadband (new finding):** `theta.vel=0.3` deg/s produced **no motion** (readback −0.586,
+  encoder noise); `12–15` deg/s engaged cleanly. A typical chunk turns ~12 deg/s (Δθ≈0.07 rad/0.333 s) — in
+  the controllable band — but **sub-deadband fine pivots may be a no-op**, so the controller likely needs a
+  minimum-|theta| floor (or to accept tiny Δθ as no-turn). Minor cross-axis noise too (pure forward reported a
+  spurious ~−1.2 deg/s; pure turn ~0.002 m/s) — watch for slight veer.
+
+**Method note (caught a test-design bug):** wheels-up CANNOT show body rotation — LeKiwi's 3-omni-wheel base
+spins the wheels tangentially but the body is fixed on the stand, and omni spin reads as "no rotation"
+visually. The first wheels-up pass therefore *looked* like "no rotation at any theta"; the readback
+(`12→11.13`) proved the motors did spin, and the **on-ground** pass gave the real body-turn direction. Added an
+`--on-ground` mode + fixed the misleading wheels-up messaging. **6b.0 passes; transport + units + signs are
+pinned → 6b.1 (open-loop replay) can convert recorded `(Δx,Δθ)` chunks to velocity with confidence.** See
+[[planning]] "6b — RESULTS (6b.0)".

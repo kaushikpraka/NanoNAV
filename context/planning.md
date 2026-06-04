@@ -399,6 +399,24 @@ first closed-loop runs; **Ctrl-C e-stop** (zero + exit) plus a physical kill wit
 on-board/edge-GPU autonomy (cutting RunPod out) → Stage 8; smooth non-stop-and-plan control → later (DDIM=3's
 ~7 s plan makes continuous control infeasible without step-distillation).
 
+### 6b — RESULTS (6b.0)
+
+**6b.0 transport + units bring-up — ✅ DONE (2026-06-04, PASS).** `scripts/lekiwi_transport_check.py` (Mac as
+lerobot client, local LAN, no GPU) vs the Pi host at **10.0.0.125**. The `(Δx,Δθ)→velocity` contract is now
+empirically pinned (full detail in [[experiment-log]] "Stage 6b.0"):
+
+| fact | value | controller rule |
+|---|---|---|
+| transport / import | `LeKiwiClient`, `lerobot.robots.lekiwi`, RTT ~14–16 ms | — |
+| action contract | 6 arm `.pos` + `x.vel`/`y.vel`/`theta.vel`; cam `top` 480×640×3 uint8 | hold arm `.pos`, `y.vel`=0 |
+| `x.vel` | **m/s, +x = forward** | `x.vel = Δx / 0.333` |
+| `theta.vel` | **deg/s, +theta = LEFT/CCW** (matches dataset +ω=CCW) | `theta.vel = (Δθ / 0.333)·57.296`, **no sign flip** |
+| chunk | `f·Δt = 10/30 = 0.333 s` | — |
+| **deadband (watch-out)** | `0.3` deg/s = no motion; `12–15` deg/s engages | min-\|theta\| floor; tiny Δθ may be a no-op |
+
+⇒ the `theta.vel` deg/s↔rad/s trap (the #1 6b risk) is **resolved**: convert ω→deg/s, no negation. 6b.1
+(open-loop replay) can now convert recorded `(Δx,Δθ)` chunks to velocity with confidence.
+
 ### Milestones
 - **6a — offline CEM eval — ✅ DONE (2026-06-04, PASS).** `src/sample/offline_planning_eval.py` +
   `configs/planning/lekiwi.yaml` (6b scaffold). 35 stratified val scenes × DDIM {20,5,3}: CEM beats
@@ -408,7 +426,7 @@ on-board/edge-GPU autonomy (cutting RunPod out) → Stage 8; smooth non-stop-and
 - **6b — closed-loop on LeKiwi — SPEC'D (2026-06-04), ready to implement; needs the robot.** RunPod runs
   the lerobot `LeKiwiClient` (Pi keeps the working host) over **Tailscale**; stop-and-plan MPC wraps the
   6a-validated engine; goals are real `top` frames (drive-and-snapshot / pre-staged); **rerun-over-Tailscale**
-  live telemetry to the Mac viewer. Sub-steps 6b.0 transport+units → 6b.1 open-loop replay → 6b.2 shared
+  live telemetry to the Mac viewer. Sub-steps 6b.0 transport+units (✅ DONE — see "6b — RESULTS (6b.0)") → 6b.1 open-loop replay → 6b.2 shared
   engine module → 6b.3 closed-loop loop → 6b.4 goal capture → 6b.5 telemetry/success. Full spec + traps
   (theta.vel deg/s↔rad/s, constant-vel-within-chunk, arm hold, reach-threshold ~35) + safety + acceptance
   criteria above in "6b — Closed-Loop MPC on LeKiwi".

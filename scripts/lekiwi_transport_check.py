@@ -64,7 +64,9 @@ def _import_lekiwi():
 # Hard safety caps (do not raise without lifting the wheels and thinking it through).
 VX_TEST = 0.05            # m/s forward test (dataset range is [0, 0.10] m/s) → ~5 cm/s
 THETA_PROBE = 0.30        # safe in BOTH unit hypotheses (rad/s→~17°/s, deg/s→~0.3°/s)
-THETA_DEG_TEST = 12.0     # only sent AFTER we conclude deg/s → ~12°/s, in-range
+THETA_DEG_TEST = 12.0     # deg/s wheels-up wheel-spin check (readback should track the command)
+THETA_GROUND_TEST = 15.0  # deg/s on the ground (dataset turn-rate max ≈ 19°/s) → clearly visible body turn
+GROUND_TURN_DUR = 2.0     # s → ~30° body rotation
 CMD_HZ = 20.0             # streaming rate while a command is active
 DEFAULT_DURATION = 1.5    # seconds per commanded motion
 
@@ -165,7 +167,12 @@ def main():
     ap.add_argument("--duration", type=float, default=DEFAULT_DURATION, help="seconds per motion test")
     ap.add_argument("--enable-motion", action="store_true",
                     help="REQUIRED to command any base motion (else only connect/frame/RTT)")
+    ap.add_argument("--on-ground", action="store_true",
+                    help="on-the-floor pass: confirm travel + the theta SIGN (which way +theta turns the body). "
+                         "Needs clear space; implies --enable-motion. Units already known = deg/s.")
     args = ap.parse_args()
+    if args.on_ground:
+        args.enable_motion = True
 
     out = Path(args.out)
     out.mkdir(parents=True, exist_ok=True)
@@ -269,49 +276,55 @@ def main():
         robot.disconnect()
         return
 
-    print("\n" + "=" * 80)
-    print("MOTION TESTS — the robot will move. SAFETY: wheels OFF the ground for the first pass.")
-    print("=" * 80)
-    if ask("Are the wheels off the ground (robot on a stand)? [y/N] ") != "y":
-        print("[motion] aborted — lift the wheels and re-run.")
-        robot.disconnect()
-        return
-
-    xk, tk = base_keys["x"], base_keys["theta"]
+    xk, tk, yk = base_keys["x"], base_keys["theta"], base_keys["y"]
     if not xk or not tk:
         print("[motion] aborted — base vel keys not mapped.")
         robot.disconnect()
         return
 
-    # 1) forward sign + magnitude (x.vel assumed m/s)
-    stream(robot, get_obs, act_keys, {xk: +VX_TEST}, args.duration,
-           f"FORWARD test  {xk}=+{VX_TEST} (expect m/s → ~{VX_TEST*100:.0f} cm/s)")
-    fwd = ask("    Which way did it drive? [f]orward (camera direction) / [b]ackward / [n]one: ")
-    print(f"    → x.vel sign: {'+x = FORWARD' if fwd.startswith('f') else '+x = BACKWARD' if fwd.startswith('b') else 'NO MOTION (check mapping/units)'}")
+    print("\n" + "=" * 80)
+    if args.on_ground:
+        # ---- on the floor: confirm travel + read the theta SIGN (units already known = deg/s) ----
+        print("ON-GROUND MOTION — the robot WILL DRIVE/TURN on the floor. Need clear space (≥1 m) + e-stop in reach.")
+        print("=" * 80)
+        if ask("Clear space around the robot and e-stop within reach? [y/N] ") != "y":
+            print("[motion] aborted — clear the area and re-run.")
+            robot.disconnect()
+            return
 
-    # 2) theta units — safe escalation
-    stream(robot, get_obs, act_keys, {tk: +THETA_PROBE}, args.duration,
-           f"TURN probe  {tk}=+{THETA_PROBE} (safe in both: rad/s→~17°/s, deg/s→~0.3°/s)")
-    rot = ask("    Did it rotate NOTICEABLY (clearly turning)? [y/N] ")
-    if rot == "y":
-        native = "rad/s"
-        side = ask("    Which way did the front swing? [l]eft (CCW) / [r]ight (CW): ")
-        print(f"    → theta.vel native unit = RAD/S (no conversion needed). +theta = "
-              f"{'LEFT/CCW' if side.startswith('l') else 'RIGHT/CW' if side.startswith('r') else '??'}")
-        print("    ⇒ controller: send ω directly in rad/s.")
-    else:
-        print("    (no visible rotation at 0.3 → consistent with native DEG/S; confirming with a 12°/s test)")
-        stream(robot, get_obs, act_keys, {tk: +THETA_DEG_TEST}, args.duration,
-               f"TURN confirm  {tk}=+{THETA_DEG_TEST} (deg/s hypothesis → ~{THETA_DEG_TEST:.0f}°/s)")
-        rot2 = ask("    Did it rotate noticeably now? [y/N] ")
-        if rot2 == "y":
-            side = ask("    Which way did the front swing? [l]eft (CCW) / [r]ight (CW): ")
-            print(f"    → theta.vel native unit = DEG/S. +theta = "
-                  f"{'LEFT/CCW' if side.startswith('l') else 'RIGHT/CW' if side.startswith('r') else '??'}")
-            print("    ⇒ controller MUST convert ω(rad/s) → deg/s via ×180/π (≈×57.3) before send_action.")
+        stream(robot, get_obs, act_keys, {xk: +VX_TEST}, args.duration,
+               f"FORWARD  {xk}=+{VX_TEST} m/s for {args.duration:.1f}s (~{VX_TEST*args.duration*100:.0f} cm travel)")
+        fwd = ask("    Which way did it travel? [f]orward (camera direction) / [b]ackward / [n]one: ")
+        print(f"    → x.vel sign: {'+x = FORWARD ✓' if fwd.startswith('f') else '+x = BACKWARD' if fwd.startswith('b') else 'NO MOTION'}")
+
+        stream(robot, get_obs, act_keys, {tk: +THETA_GROUND_TEST}, GROUND_TURN_DUR,
+               f"TURN  {tk}=+{THETA_GROUND_TEST} deg/s for {GROUND_TURN_DUR:.1f}s (≈{THETA_GROUND_TEST*GROUND_TURN_DUR:.0f}° body turn)")
+        side = ask("    Which way did the BODY rotate? [l]eft/CCW (camera pans left) / [r]ight/CW / [n]one: ")
+        if side.startswith("l"):
+            print("    → +theta.vel = LEFT / CCW (camera pans left). Controller: +Δθ → +deg/s (no sign flip).")
+        elif side.startswith("r"):
+            print("    → +theta.vel = RIGHT / CW. If the dataset's +Δθ is CCW, the controller must NEGATE: +Δθ → −deg/s.")
         else:
-            print("    → still no rotation — neither hypothesis produced motion. Check the theta key mapping, "
-                  "host config, and that the base motors are enabled.")
+            print("    → no body rotation on the ground — raise the magnitude / check the base motors.")
+    else:
+        # ---- wheels-up: cannot show body rotation (omni wheels spin, body fixed on the stand) ----
+        print("WHEELS-UP MOTION — wheels spin free. NOTE: a theta command spins the omni wheels but the BODY")
+        print("can't turn on a stand, so rotation DIRECTION is unreadable here — use --on-ground for the theta sign.")
+        print("=" * 80)
+        if ask("Are the wheels off the ground (robot on a stand)? [y/N] ") != "y":
+            print("[motion] aborted — lift the wheels (or use --on-ground on the floor).")
+            robot.disconnect()
+            return
+
+        stream(robot, get_obs, act_keys, {xk: +VX_TEST}, args.duration,
+               f"FORWARD test  {xk}=+{VX_TEST} m/s (wheels should roll forward)")
+        fwd = ask("    Which way would it drive? [f]orward (camera direction) / [b]ackward / [n]one: ")
+        print(f"    → x.vel sign: {'+x = FORWARD' if fwd.startswith('f') else '+x = BACKWARD' if fwd.startswith('b') else 'NO MOTION (check mapping)'}")
+
+        stream(robot, get_obs, act_keys, {tk: +THETA_DEG_TEST}, args.duration,
+               f"TURN  {tk}=+{THETA_DEG_TEST} deg/s — watch the WHEELS spin + the reported theta.vel readback")
+        print("    (theta.vel is deg/s — set by the dataset build; the readback above should track ~the command.")
+        print("     Wheels-up can't show body-turn direction → run with --on-ground for the theta SIGN.)")
 
     # park: zero, then disconnect
     obs = get_obs(robot)
