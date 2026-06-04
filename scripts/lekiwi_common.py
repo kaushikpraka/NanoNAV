@@ -85,20 +85,49 @@ def clamp_velocity(vx, theta_deg):
             float(np.clip(theta_deg, -THETA_MAX_DEG, THETA_MAX_DEG)))
 
 
-def stream_velocity(robot, action_keys, base_keys, vx, theta_deg, duration):
-    """Stream constant (vx m/s, theta_deg deg/s) for `duration` s at CMD_HZ, arm held. Caller stops."""
+def capture_hold(robot, action_keys, base_keys):
+    """
+    The constant non-base part of every action: arm `.pos` held at the observed values, base vels
+    zeroed. Capture ONCE per run (the arm doesn't move) so the hot send-loop never calls
+    get_observation — keeping the command cadence steady and the chunk duration precise.
+    """
+    zero_base = {k: 0.0 for k in base_keys.values() if k}
+    return build_action(robot.get_observation(), action_keys, zero_base)
+
+
+def stream_velocity(robot, action_keys, base_keys, vx, theta_deg, duration, hold_action=None):
+    """
+    Hold a constant (vx m/s, theta_deg deg/s) for EXACTLY `duration` s, refreshing at CMD_HZ to keep
+    the host watchdog alive. Sends a PRECOMPUTED action (no get_observation in the loop, so cadence is
+    steady) and paces against a fixed deadline with a final partial sleep — so the chunk lasts `duration`
+    to within ~one send latency, not overshot by a whole get_obs+sleep iteration. Caller stops afterwards.
+    """
     xk, tk, yk = base_keys["x"], base_keys["theta"], base_keys["y"]
-    base = {xk: vx, tk: theta_deg}
+    if hold_action is None:
+        hold_action = capture_hold(robot, action_keys, base_keys)
+    action = dict(hold_action)
+    action[xk] = float(vx)
+    action[tk] = float(theta_deg)
     if yk:
-        base[yk] = 0.0
+        action[yk] = 0.0
+
     period = 1.0 / CMD_HZ
-    t_end = time.monotonic() + duration
+    t0 = time.monotonic()
+    t_end = t0 + duration
     n = 0
-    while time.monotonic() < t_end:
-        obs = robot.get_observation()
-        robot.send_action(build_action(obs, action_keys, base))
+    next_send = t0
+    while True:
+        robot.send_action(action)
         n += 1
-        time.sleep(period)
+        next_send += period
+        if next_send >= t_end:
+            rem = t_end - time.monotonic()      # final partial sleep to land exactly on t_end
+            if rem > 0:
+                time.sleep(rem)
+            break
+        slack = next_send - time.monotonic()
+        if slack > 0:
+            time.sleep(slack)
     return n
 
 

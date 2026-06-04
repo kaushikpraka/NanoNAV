@@ -335,12 +335,17 @@ def main():
     except EOFError:
         robot.disconnect(); return
 
+    hold = lk.capture_hold(robot, act_keys, base_keys)   # arm pose frozen once; keeps the send-loop tight
+    import time as _t
     for i, (vx, th_deg) in enumerate(cmds):
-        n = lk.stream_velocity(robot, act_keys, base_keys, vx, th_deg, lk.CHUNK_DT)
+        t0 = _t.monotonic()
+        n = lk.stream_velocity(robot, act_keys, base_keys, vx, th_deg, lk.CHUNK_DT, hold_action=hold)
+        dt_ms = (_t.monotonic() - t0) * 1000.0
         rep = robot.get_observation()
         rv = {k: round(float(np.asarray(rep[k]).reshape(-1)[0]), 3) for k in rep
               if isinstance(k, str) and k.lower().endswith(".vel")}
-        print(f"  chunk {i:>3}/{len(cmds)}  sent x.vel={vx:.3f} theta.vel={th_deg:+.2f}  ({n} cmds)  reported {rv}")
+        print(f"  chunk {i:>3}/{len(cmds)}  sent x.vel={vx:.3f} theta.vel={th_deg:+.2f}  "
+              f"({n} cmds, {dt_ms:.0f}ms / {lk.CHUNK_DT*1000:.0f}ms target)  reported {rv}")
         if args.stop_between:
             lk.stop(robot, act_keys, base_keys)
 
