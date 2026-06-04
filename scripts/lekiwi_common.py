@@ -21,9 +21,11 @@ CHUNK_DT = 10.0 / 30.0           # f·Δt = 0.333 s  (Run-002 chunk, f=10 @ 30 H
 RAD2DEG = 180.0 / pi
 CMD_HZ = 20.0                    # stream rate while a command is active (host watchdog)
 
-# Safety envelope = the dataset action range (vx∈[0,0.10] m/s, |ω|≤0.34 rad/s ≈ 19.5°/s).
+# Safety envelope = the TRUE dataset action range, measured across all 50 episodes
+# (scripts run 2026-06-04): vx∈[0,0.10] m/s, theta.vel∈[-30,+30]°/s (=±0.5236 rad/s = ±π/6,
+# a clean LeKiwi base cap). NOTE: the earlier "|ω|≤0.34 rad/s ≈19.5°/s" figure was wrong.
 VX_MIN, VX_MAX = 0.0, 0.10
-THETA_MAX_DEG = 19.5
+THETA_MAX_DEG = 30.0
 # Low-speed rotation deadband observed in 6b.0: 0.3°/s = no motion, 12–15°/s engages.
 DEADBAND_WARN_DEG = 4.0
 

@@ -78,76 +78,76 @@ def synth_chunks(pattern, k):
     return chunks, None
 
 
-def dataset_chunks(repo_id, root, episode, start, n_chunks, f):
+def _resolve(repo_id, relpath, root):
+    """Local file under --root, else download the single file from HF (no lerobot version gate)."""
+    if root:
+        p = Path(root) / relpath
+        if not p.exists():
+            raise FileNotFoundError(f"{p} (check --root layout)")
+        return str(p)
+    from huggingface_hub import hf_hub_download
+    return hf_hub_download(repo_id, relpath, repo_type="dataset")
+
+
+def dataset_chunks(repo_id, root, episode, start, n_chunks, f, video_key="observation.images.top"):
     """
     Integrate a recorded episode's per-frame (x.vel m/s, theta.vel rad/s) into f-window
     (Δx, Δθ) chunks via the same unicycle integration the dataloader uses (integrate_se2).
+    Reads the parquet DIRECTLY (lerobot v3.0 can't read this v2.1 dataset) — version-proof.
     Returns (chunks, raw_steps) with raw_steps=[(vx,om,dt)...] at 30 Hz for the fine path.
     """
-    try:
-        from lerobot.datasets.lerobot_dataset import LeRobotDataset  # type: ignore
-    except Exception:
-        from lerobot.common.datasets.lerobot_dataset import LeRobotDataset  # type: ignore
-
-    ds = LeRobotDataset(repo_id, root=root)
-    # episode frame range
-    try:
-        f0 = int(ds.episode_data_index["from"][episode]); f1 = int(ds.episode_data_index["to"][episode])
-    except Exception as e:
-        raise SystemExit(f"[dataset] could not read episode_data_index for ep {episode}: {e}")
-
-    # per-frame action = [x.vel (m/s), theta.vel (rad/s)]  (build converted deg/s→rad/s)
-    acts = []
-    for i in range(f0, f1):
-        a = np.asarray(ds[i]["action"]).reshape(-1)
-        acts.append((float(a[0]), float(a[1])))
+    import pandas as pd
+    rel = f"data/chunk-{episode // 1000:03d}/episode_{episode:06d}.parquet"
+    df = pd.read_parquet(_resolve(repo_id, rel, root)).sort_values("frame_index")
+    acts = np.stack(df["action"].to_numpy()).astype(float)   # [T,2] = [x.vel m/s, theta.vel rad/s]
+    print(f"[dataset] ep{episode}: {len(acts)} frames | "
+          f"x.vel∈[{acts[:,0].min():.3f},{acts[:,0].max():.3f}] m/s | "
+          f"theta.vel∈[{acts[:,1].min():+.3f},{acts[:,1].max():+.3f}] (rad/s expected, |ω|≲0.34)")
     acts = acts[start:]
     dt = 1.0 / 30.0
-
     chunks, raw = [], []
-    n = 0
     while (n_chunks is None or len(chunks) < n_chunks) and (len(chunks) + 1) * f <= len(acts):
         win = acts[len(chunks) * f:(len(chunks) + 1) * f]
         x = th = 0.0
         for vx, om in win:
             x += vx * dt * np.cos(th)
             th += om * dt
-            raw.append((vx, om, dt))
+            raw.append((float(vx), float(om), dt))
         chunks.append((x, th))
-        n += 1
     if not chunks:
         raise SystemExit("[dataset] no full chunks in range — lower --start or --f, or pick a longer episode.")
     return chunks, raw
 
 
-def save_recorded_frames(repo_id, root, episode, start, n_chunks, f, n_frames, out_png):
-    """Dump n_frames evenly-spaced recorded `top` frames across the replayed range as a filmstrip."""
+def save_recorded_frames(repo_id, root, episode, start, n_chunks, f, n_frames, out_png,
+                         video_key="observation.images.top"):
+    """Dump n_frames evenly-spaced recorded `top` frames as a filmstrip (decoded directly from the mp4)."""
     try:
-        try:
-            from lerobot.datasets.lerobot_dataset import LeRobotDataset  # type: ignore
-        except Exception:
-            from lerobot.common.datasets.lerobot_dataset import LeRobotDataset  # type: ignore
+        import av
         import matplotlib
         matplotlib.use("Agg")
         import matplotlib.pyplot as plt
 
-        ds = LeRobotDataset(repo_id, root=root)
-        f0 = int(ds.episode_data_index["from"][episode])
-        f1 = int(ds.episode_data_index["to"][episode])
-        lo = f0 + start
-        hi = min(f1, lo + n_chunks * f)
+        rel = f"videos/chunk-{episode // 1000:03d}/{video_key}/episode_{episode:06d}.mp4"
+        path = _resolve(repo_id, rel, root)
+        lo, hi = start, start + n_chunks * f
         idxs = np.linspace(lo, hi - 1, n_frames).round().astype(int)
+        want = set(int(i) for i in idxs)
+
+        grabbed = {}
+        container = av.open(path)
+        for fi, frame in enumerate(container.decode(video=0)):
+            if fi in want:
+                grabbed[fi] = frame.to_ndarray(format="rgb24")
+            if fi >= max(want):
+                break
+        container.close()
 
         fig, axes = plt.subplots(1, n_frames, figsize=(2.4 * n_frames, 2.6))
         axes = np.atleast_1d(axes)
         for ax, i in zip(axes, idxs):
-            img = np.asarray(ds[int(i)]["top"])
-            if img.ndim == 3 and img.shape[0] in (1, 3):     # CHW → HWC
-                img = np.transpose(img, (1, 2, 0))
-            if img.dtype != np.uint8:
-                img = (255 * np.clip(img, 0, 1)).astype(np.uint8) if img.max() <= 1.0 else img.astype(np.uint8)
-            ax.imshow(img.squeeze()); ax.axis("off")
-            ax.set_title(f"chunk ~{(i - lo) // f}", fontsize=8)
+            ax.imshow(grabbed[int(i)]); ax.axis("off")
+            ax.set_title(f"chunk ~{(int(i) - lo) // f}", fontsize=8)
         fig.suptitle(f"recorded `top` frames — ep{episode} (compare to the robot's live view)", fontsize=9)
         fig.tight_layout()
         out_png.parent.mkdir(parents=True, exist_ok=True)
