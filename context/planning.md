@@ -59,29 +59,41 @@ diffusion-forcing (3 frames/chunk × DDIM each = 60 forwards/chunk), **compute-b
 the CEM batch is compute-bound, not overhead-bound, so compile barely helps. It is NOT the big lever.
 (`reduce-overhead`/CUDA-graphs won't add much either — launch overhead is negligible at batch 64.)
 
-**The real levers reduce compute:** DDIM 20→5 (**~4×**, biggest) × 64→32 samples (**~2×**, linear when
-compute-bound) × 5→3 opt-steps (**~1.7×**) ≈ 13× (× compile 1.13× ≈ **15×**) → **~10 s/replan**. Below
-that needs **step-distillation** (DDIM→1–4) or a smaller model; real-time (167 ms) is out of reach for the
+**The real levers reduce compute** (latency is ~linear in each): DDIM steps, num_samples, opt_steps, H.
+**Measured** (see "Few-step sampling" below): DDIM=3 + 32 samples + 3 opt-steps + H=3 → **~6.9 s/replan**
+(~6 s compiled), a **~21× win** over the DDIM-20 / 64×5 default (146 s), with no quality loss. Below ~5 s
+needs **step-distillation** (DDIM→1–2) or a smaller model; real-time (167 ms) is out of reach for the
 prototype. **6a (offline) is unaffected** — latency irrelevant; just optionally DDIM=10 to speed the
 sweep. **6b (closed-loop)** targets ~10 s/replan stop-and-plan. (The "Runtime Analysis" section below is
 the original optimistic estimate — superseded.)
 
-### Few-step sampling — DDIM=5 validated (2026-06-03); distillation NOT needed
-Cheap-settings eval on step-8000 (`results/cheap_ddim5_step8000/`) — DDIM=5 vs the DDIM-20/50 baselines on
-the planning-critical signals, **all hold:**
-| metric | baseline | DDIM=5 |
-|---|---|---|
-| gate GT / zero / random | 35.3 / 41.2 / 45.7 (DDIM20) | 33.5 / 39.8 / 44.4 |
-| gate separation (random−GT) | 10.4 | **10.8** |
-| motion trans / rot / arc latentL2 | 30.4 / 35.0 / 37.4 (DDIM50) | 28.6 / 32.5 / 36.2 |
-| controllability L-vs-R / straight-vs-stop | ~62 / ~37 (DDIM50) | ~57 / ~34 |
+### Few-step sampling — DDIM=3 validated (2026-06-04); distillation NOT needed
+Cheap-settings eval on step-8000 (`results/cheap_ddim{5,3}_step8000/`) — few-step vs the DDIM-20/50
+baselines on the planning-critical signals. **DDIM=5 and DDIM=3 both hold:**
+| metric | DDIM 50/20 | DDIM 5 | DDIM 3 |
+|---|---|---|---|
+| gate separation (random−GT) | 10.4 | 10.8 | 10.5 |
+| motion trans / rot / arc latentL2 | 30.4 / 35.0 / 37.4 | 28.6 / 32.5 / 36.2 | 27.9 / 33.6 / 35.8 |
+| controllability L-vs-R / straight-vs-stop | ~62 / ~37 | ~57.5 / ~34 | ~57.8 / ~34.9 |
+| controllability pivot-L-vs-R (pure rotation) | ~64 | ~58.8 | ~54.6 ⚠ |
 
-Rollout accuracy + motion-tracking are comparable (even slightly better), action separation is preserved,
-controllability drops only ~7–8% but stays far above the ~12 noise floor. ⇒ **CEM can run at DDIM=5 with
-no meaningful quality loss — the ~10 s/replan is achievable for free, and LCM distillation is NOT
-required.** (The model's futures are low-entropy/near-deterministic, so few-step sampling captures the
-mode.) Distillation (DDIM→1–2) stays a back-pocket option only if real-time is later needed. Worth a
-DDIM=3 probe.
+Gate separation + motion-tracking + arc/turn controllability hold flat; the only signal that softens is
+**pure-rotation (pivot) control** (64→58.8→54.6) — still ≫ the ~12 noise floor, but it's what degrades
+first, so **DDIM=3 is ~the floor** before distillation. (Futures are low-entropy/near-deterministic, so
+few steps capture the mode.)
+
+**Measured latency (uncompiled, H100), cheap CEM config 32 samples × 3 opt-steps × H=3:**
+| DDIM | per-sample | replan |
+|---|---|---|
+| 20 (default-ish) | 454 ms | ~45 s |
+| 5 | 115 ms | 11.3 s |
+| **3 (recommended)** | **70 ms** | **6.9 s** (~6 s compiled) |
+
+Latency is ~linear in DDIM steps (compute-bound). ⇒ **Run the planner at DDIM=3, 32 samples, 3 opt-steps,
+H=3 → ~7 s/replan with no quality loss — a ~21× win over the DDIM-20/64×5 default (146 s).** LCM
+distillation (DDIM→1–2) stays a back-pocket option only if real-time is later needed (and would mainly
+buy back pivot control at very low steps). On a cheaper GPU these replans are ~2–3× longer (fine for 6a
+offline; for 6b closed-loop the H100 is the better box).
 - **Scoring:** latent-L2 (`objective.py`), valid **<~30 cm**; beyond that the landscape flattens → use the
   **waypoint scaffold** (Solution 1 below) for longer routes.
 
