@@ -138,18 +138,32 @@ def rr_init(args):
         return None
 
 
+def _rr_set_time(rr, step):
+    if hasattr(rr, "set_time"):                      # rerun ≥ 0.23
+        try:
+            rr.set_time("step", sequence=step); return
+        except TypeError:
+            pass
+    rr.set_time_sequence("step", step)               # older rerun
+
+
+def _rr_scalar_cls(rr):
+    return getattr(rr, "Scalars", None) or getattr(rr, "Scalar")   # 0.23+ Scalars, else Scalar
+
+
 def rr_log(rr, step, frame, goal, res: PlanResult, executed):
     if rr is None:
         return
     try:
-        rr.set_time_sequence("step", step)
+        Scalar = _rr_scalar_cls(rr)
+        _rr_set_time(rr, step)
         rr.log("live", rr.Image(frame))
         rr.log("goal", rr.Image(goal))
-        rr.log("dist_to_goal", rr.Scalar(res.dist_to_goal))
-        rr.log("cmd/vx", rr.Scalar(executed[0]))
-        rr.log("cmd/theta_deg", rr.Scalar(executed[1]))
+        rr.log("dist_to_goal", Scalar(res.dist_to_goal))
+        rr.log("cmd/vx", Scalar(executed[0]))
+        rr.log("cmd/theta_deg", Scalar(executed[1]))
         if res.cem_loss is not None:
-            rr.log("cem_loss", rr.Scalar(res.cem_loss))
+            rr.log("cem_loss", Scalar(res.cem_loss))
         if res.imagined_rgb is not None:
             rr.log("imagined", rr.Image(res.imagined_rgb))
         for i, e in enumerate(res.elite_rgb or []):
