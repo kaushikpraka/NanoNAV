@@ -74,10 +74,14 @@ The CEM/MPC core already exists (`cem_planner.py` `CEMPlanner`, `diffusion_world
 `objective.py`, `preprocessor.py`, `planning_experiment.py` + `_sample_dset_goals`). Stage 6 is **wiring
 it for LeKiwi**: the `envs/` dir has no LeKiwi/dataset env. Plan (eval-grounded, see [[planning]] "Stage
 6 — Implementation Plan"):
-- **6a — offline CEM eval (next, GPU):** dataset-replay harness + `planning/lekiwi.yaml`; CEM recovers an
-  action sequence to a goal frame `goal_H` chunks ahead; report goal latent-L2 + decoded planned-vs-GT
-  rollouts. No robot. **Validate planning quality at cheap sampler settings (DDIM≈5, ~32 samples)** — the
-  regime that makes 6b's ~10 s/replan viable; if few-step sampling degrades too much, distill (LCM).
+- **6a — offline CEM eval (next, GPU) — SPEC'D, ready to implement.** Standalone
+  `src/sample/offline_planning_eval.py` (NOT a registry env — LeKiwi has no simulator/`states.pth` layout,
+  so the sim-coupled `PlanningExperiment._run_mpc` doesn't fit). CEM recovers a goal-reaching action
+  sequence to a val frame `goal_H` chunks ahead, graded against the dataset answer key — `do_nothing` /
+  `gt_ceiling` / `cem_reached` / `action_recovery` + decoded montages — swept over **DDIM ∈ {20,5,3}** to
+  confirm the cheap-sampler regime that makes 6b's ~7 s/replan viable (else fall back to DDIM=5 / distill).
+  Open-loop planning accuracy, not closed-loop success (that's 6b). Full spec + run command + acceptance
+  criteria in [[planning]] "6a — Offline Planning Eval". Author locally; run on the H100 pod (~minutes).
 - **6b — closed-loop on LeKiwi:** real-robot env, stop-and-plan MPC, goal-image tasks.
 - **6c — long-range:** topological waypoint graph.
 

@@ -97,13 +97,115 @@ offline; for 6b closed-loop the H100 is the better box).
 - **Scoring:** latent-L2 (`objective.py`), valid **<~30 cm**; beyond that the landscape flattens → use the
   **waypoint scaffold** (Solution 1 below) for longer routes.
 
+### 6a — Offline Planning Eval (implementation spec, 2026-06-04)
+
+**The one question 6a answers:** *given a goal image, can the planner recover steering commands that
+reach it* — and does that hold at the cheap sampler settings (DDIM=3) that make 6b's ~7 s/replan viable?
+This is the gate before any robot/network work. **The planner validated here is the exact engine 6b wraps
+behind an HTTP endpoint — 6a is not a throwaway test, it builds + bench-tests the engine.**
+
+**Design decision — standalone eval script, NOT a registry "env".** `PlanningExperiment._run_mpc` /
+`_sample_dset_goals` are built for *steppable sim envs* (pusht/point_maze/wall: `env.prepare/step/
+eval_state`, a `states.pth`/`actions.pth` tensor layout). LeKiwi has **no simulator and no way to execute
+an arbitrary CEM action offline**, so we do **not** fake a LeKiwi env (its `step()` would have to use the
+WM as its own dynamics — circular/dishonest). Instead follow the Run 002 eval-tool pattern
+(`src/sample/motion_rollout_viz.py`, `long_rollout_viz.py`): load ckpt + dataset directly, run CEM, grade
+against the dataset as a built-in answer key.
+
+**What 6a measures = open-loop planning accuracy (a necessary precondition), NOT closed-loop success.**
+Offline there is no ground truth for "where the robot ends up if it executes CEM's actions" — that is 6b.
+6a proves CEM can *invert the world model* to recover goal-reaching actions.
+
+**The test (per sample):** from a held-out **val** episode, take a start frame z₀ and a **goal frame
+`goal_H` chunks ahead** (a real reachable goal — we also know the *true* commands that produced it). Hide
+the commands; give CEM only the two frames; let it plan (imagine 32 candidate command sequences → WM
+rollout → keep the ones whose imagined future looks most like the goal → refit). Grade against the answer
+key. Metrics, per (init,goal) pair × DDIM setting:
+
+| metric | meaning |
+|---|---|
+| `do_nothing` = L2(z₀, z_goal) | floor CEM must beat (distance if robot never moves) |
+| `gt_ceiling` = L2(WM.rollout(z₀, **GT actions**)₋₁, z_goal) | WM accuracy ceiling — CEM can't beat the WM's own prediction error; splits "planner failed" from "WM wrong" |
+| `cem_reached` = L2(WM.rollout(z₀, **CEM actions**)₋₁, z_goal) | did CEM drive the WM prediction to the goal? want ≈ `gt_ceiling`, ≪ `do_nothing` |
+| `action_recovery` = ‖denorm(CEM a) − GT (Δx,Δθ)‖ | **strongest offline signal** — did CEM re-derive ≈ the true commands (sign + magnitude on forward Δx, turn Δθ)? |
+| decoded montage | z₀ / z_goal / CEM-planned rollout decoded through SD-VAE → eyeball whether the planned future resembles the goal |
+
+**Headline deliverable — the DDIM sweep.** Run the whole battery at **DDIM ∈ {20, 5, 3}** (+ 50 for the
+final montage). If DDIM=3 metrics ≈ DDIM=20 with no goal-reaching collapse, the ~7 s/replan cheap regime
+(DDIM=3, 32 samples, 3 opt-steps) is green-lit for 6b. Watch turn-heavy goals — pivot-rotation control is
+what softens first at DDIM=3 (see "Few-step sampling" above). If it collapses → fall back to DDIM=5 or flag
+LCM distillation. Learned here for free, not live on the robot.
+
+**Scene coverage — test across a variety of dataset scenes (required, not optional).** A single seed over
+one episode is not a valid 6a result; aggregate-only numbers hide motion-specific failure. Sample
+(init, goal) pairs to span the dataset and **stratify the report**:
+- **Across episodes / space:** draw `init` frames from **many distinct val episodes** (cap ~1–2 pairs per
+  episode), spanning the room's spatial coverage and starting headings — different landmarks in view
+  (desk, tripod/easel, bowl/box, bare wall, near-field floor), not all from one corner.
+- **Across motion type (stratify + report per-stratum, don't just average):** classify each goal by its GT
+  integrated `(Δx, Δθ)` into **translation-dominant**, **rotation/pivot-dominant**, **arc (combined)**, and
+  **slow / near-stationary**. Each stresses the WM differently and **pivot-dominant is the one that softens
+  first at DDIM=3** — so it must be its own reported bucket, not buried in the mean. Aim for rough balance
+  across buckets rather than whatever the random draw gives (the data is bang-bang, so translation goals
+  dominate a naive sample).
+- **Non-trivial goals only:** reject pairs where `do_nothing` is already tiny (goal ≈ start) — those inflate
+  apparent success without testing planning. Require a minimum goal displacement.
+- **Reproducible + localizable:** fix `--seed`, but log per-scene rows (episode id, offset, motion bucket,
+  all metrics) so a failure points at a specific scene/motion, not just a worse average.
+- **Scale `n_evals` for coverage:** ~30–40 pairs (≈8–10 per motion bucket) — still only minutes on the H100.
+
+**Deliverables**
+- **New (fork): `src/sample/offline_planning_eval.py`** — built on the `motion_rollout_viz.py` template
+  (already loads ckpt+dataset+WM+decode); adds CEM + goal-sampling + the metric battery. Reuses
+  **unchanged**: `CEMPlanner` (`action_dim=2`, `action_low/high` from f=10 stats), `DiffusionWorldModel`
+  `.rollout`/`.encode_obs`, `create_objective_fn(mode="last", visual_metric="mse")`, `Preprocessor` with
+  the integrate_se2 action stats (mean `[0.0221,−0.0006]`, std `[0.0141,0.0707]`), and the lekiwi val split
+  for frames + GT integrated `(Δx,Δθ)`. CLI: `--ckpt --out --n_evals --goal_H --horizon --ddim <list>
+  --num_samples --opt_steps --seed`. **Goal sampling stratifies by motion bucket + draws across episodes
+  (see "Scene coverage")** — classify each candidate goal by GT `(Δx,Δθ)`, balance across
+  translation/pivot/arc/slow, cap ~1–2 per episode, reject near-trivial goals. Outputs
+  `offline_planning_eval.json` (per-scene rows tagged with episode/offset/**motion bucket**, plus aggregate
+  **and per-bucket** summaries for each DDIM) + a montage PNG/MP4 per sample.
+- **Optional `src/configs/planning/lekiwi.yaml`** — not needed for the standalone script (CLI suffices),
+  but 6b will need it; add a minimal one for the record.
+
+**Action-wiring traps (why we skip the experiment harness — integrate_se2 mode):**
+- `planning_experiment.py:108-109` does `action_dim_total = action_dim * frame_interval` → with
+  integrate_se2 that's `2×10 = 20`, a wrong 20-D CEM search. The standalone script sets `action_dim=2`.
+- `_run_mpc` (~`:641`) does `act.reshape(frame_interval, -1)` to un-pack concat actions — meaningless for
+  integrated deltas. Both need a conditional fix **only if 6b later routes through `PlanningExperiment`**;
+  out of 6a's path.
+
+**Run (GPU pod; ckpt + dataset already on `/workspace`; ~a few minutes of H100):**
+```
+python src/sample/offline_planning_eval.py \
+  --ckpt /workspace/results/…/epoch=13-step=8000.ckpt \
+  --out results/offline_planning_step8000 \
+  --n_evals 36 --goal_H 3 --horizon 3 \
+  --ddim 20 5 3 --num_samples 32 --opt_steps 3 --seed 42
+```
+
+**Acceptance criteria (gate to 6b) — must hold across scenes, reported per motion bucket:**
+1. CEM **beats `do_nothing`** and `cem_reached` ≈ `gt_ceiling` (planner near-optimal *given* the WM) —
+   **in every motion bucket**, not just on average (translation goals will pass easily; pivot/arc are the
+   real test).
+2. **Action recovery** has correct sign + comparable magnitude on the dominant forward/turn components,
+   across translation-, pivot-, and arc-dominant goals.
+3. **Decoded montages** show the planned future resembling the goal, sampled from *different* scenes/buckets.
+4. **Cheap-sampler hold:** DDIM=3/5 ≈ DDIM=20 with no goal-reaching collapse **in any bucket** (watch
+   pivot-dominant — it softens first) → confirms the 6b replan setting.
+
+**Risks:** latent-L2 flattens **>~30 cm** → keep `goal_H` short (3 chunks ≈ 10 cm at f=10); long range is
+6c (waypoints). Goals are sampled from real forward trajectories so they *are* reachable — a failure is the
+planner/WM, not infeasibility.
+
 ### Milestones
-- **6a — offline CEM eval (next; GPU).** Build the dataset-replay env + `lekiwi.yaml`; run
-  `experiment=planning … ckpt_path=<step-8000>`; report goal-reaching latent-L2 + decoded planned-vs-GT
-  rollouts. Proves planner + WM + scoring before any hardware. **Crucially, validate planning quality at
-  the cheap sampler settings (DDIM≈5, ~32 samples) that make 6b's ~10 s replan viable** — 6a must confirm
-  CEM still reaches goals at them (if naive few-step sampling degrades too much, the fix is distillation —
-  see "few-step sampling" note below).
+- **6a — offline CEM eval (next; GPU). Spec'd — see "6a — Offline Planning Eval" above.** Standalone
+  `src/sample/offline_planning_eval.py` (NOT a registry env — LeKiwi has no simulator): CEM recovers
+  goal-reaching actions from held-out val frames, graded against the dataset answer key (`do_nothing` /
+  `gt_ceiling` / `cem_reached` / `action_recovery`) + decoded montages, swept over DDIM ∈ {20,5,3} to
+  confirm the cheap-sampler regime that makes 6b's ~7 s replan viable. Proves planner + WM + scoring before
+  any hardware; the validated planner is the engine 6b wraps.
 - **6b — closed-loop on LeKiwi.** Real-robot env, stop-and-plan MPC, goal-image tasks. Needs the robot.
 - **6c — long-range.** Topological waypoint graph (Solution 1) once short-range MPC works.
 
