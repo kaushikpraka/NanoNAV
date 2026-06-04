@@ -30,6 +30,7 @@ Reuses the 6b.0/6b.1-validated `lekiwi_common` (contract, precise streaming, cla
 """
 
 import argparse
+import os
 import signal
 import sys
 import time
@@ -79,13 +80,14 @@ def make_planner(args):
         return StubPlanner(vx=args.stub_vx, theta_deg=args.stub_theta, steps_to_reach=args.stub_steps)
     # --planner wm: the real engine (Stage 6b.2, in the fork) — runs on the pod with the ckpt + GPU.
     if not args.nanowm_src:
-        sys.exit("--planner wm needs --nanowm-src <path to fork>/src and --ckpt (run on the pod).")
-    sys.path.append(args.nanowm_src)
+        sys.exit("--planner wm needs --nanowm-src <fork>/src and --ckpt (run on the pod).")
+    sys.path.append(args.nanowm_src)                           # .../src
+    sys.path.append(os.path.join(args.nanowm_src, "sample"))   # .../src/sample (where lekiwi_engine lives)
     try:
-        from lekiwi_engine import LekiwiPlanner          # fork: src/planning/lekiwi_engine.py (6b.2)
+        from lekiwi_engine import LekiwiPlanner                # fork: src/sample/lekiwi_engine.py (6b.2)
     except Exception as e:
-        sys.exit(f"[planner=wm] could not import lekiwi_engine from {args.nanowm_src}: {e}\n"
-                 f"  (6b.2 engine module — author/run on the pod where nanowm + the checkpoint live.)")
+        sys.exit(f"[planner=wm] could not import lekiwi_engine from {args.nanowm_src}/sample: {e}\n"
+                 f"  (6b.2 engine module — run on the pod where nanowm + the checkpoint live.)")
     return LekiwiPlanner(
         ckpt=args.ckpt, device=args.device, ddim=args.ddim,
         num_samples=args.num_samples, opt_steps=args.opt_steps, topk=args.topk,
