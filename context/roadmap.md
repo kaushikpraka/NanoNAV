@@ -100,8 +100,14 @@ it for LeKiwi**: the `envs/` dir has no LeKiwi/dataset env. Plan (eval-grounded,
   corrected to ±30°/s; dataset read direct from parquet+mp4 since recent lerobot can't load v2.1) →
   **6b.3 controller harness ✅ validated on hardware with a stub planner** (`scripts/lekiwi_mpc.py`:
   stop-and-plan loop + precise timing + clamp + termination + rerun 0.26 telemetry, planner injected) →
-  **6b.2 engine ✅ authored** (fork `4720053` `src/sample/lekiwi_engine.LekiwiPlanner` wraps the 6a path +
-  live-frame letterbox preprocess + `CEMPlanner` `return_elites` patch; **pod-test pending** — no local GPU) →
+  **6b.2 engine ✅ validated on the pod** (fork `4720053` `src/sample/lekiwi_engine.LekiwiPlanner` wraps the 6a
+  path + live-frame letterbox preprocess + `CEMPlanner` `return_elites` patch; **smoke-test PASS on H100 +
+  step-8000**, 2026-06-05 — raw 480×640 frames through the full preprocess→encode→CEM→rollout→decode path;
+  action stats match, do_nothing dist≈0, and on a moving pair (ep11 504→534, GT fwd+right-turn) CEM recovered
+  the **correct signs** `vx=+0.067, θ=−15.6°/s`; decoded `imagined` is a coherent top-view. **Hard
+  precondition surfaced:** the live controller MUST pass `action_mean/std` explicitly — the engine's
+  dataset-reconstruction fallback is dead on the pod (private-repo 401 + lerobot-v3-can't-read-v2.1) and the
+  stats aren't in the ckpt; see [[experiment-log]] 2026-06-05) →
   6b.4 goal capture → 6b.5 telemetry. Top trap: `theta.vel`
   deg/s↔rad/s (57× scale). **Develop locally for free** (all authoring + the no-model robot checks 6b.0/6b.1
   with the Mac as lerobot client on the LAN, stub-planner end-to-end test); **resume on the pod only for live
@@ -133,6 +139,9 @@ branch is now alive/action-sensitive (clean gt<zero<random + visible motion trac
 gate reads FAIL but is judged mis-calibrated; the **cross-checkpoint rollout eval** found rollout
 quality peaks at **~6K–8K** then overfits ⇒ **step-8000 is the chosen planner checkpoint** → ✅ **6a
 (offline planner eval) PASSED** (35 stratified val scenes × DDIM {20,5,3}: CEM WM-optimal in every motion
-bucket, DDIM=3 holds, engine validated) → **next: 6b (closed-loop on LeKiwi)**. Decision gate for the
+bucket, DDIM=3 holds, engine validated) → ✅ **6b.0/6b.1 hardware bring-up + 6b.3 harness + 6b.2 engine
+smoke-test PASS** (LekiwiPlanner runs end-to-end on H100/step-8000; correct sign recovery on a moving pair;
+explicit `action_mean/std` is now a hard launch precondition) → **next: 6b.3 closed-loop on LeKiwi** (swap
+stub→`--planner wm`, needs the robot). Decision gate for the
 planner is now **rollout health** (action separation + motion-tracking fidelity), not the RMS number. Camera
 relocation / odometry conditioning remains a **fallback** only if rollouts prove inadequate.

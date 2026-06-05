@@ -357,3 +357,55 @@ Artifacts: `viz/lekiwi_6b1/` (trajectory plots + filmstrips). **6b.1 passes — 
 pipeline is grounded end-to-end on hardware.** Remaining 6b is the GPU-side live CEM: **6b.2** (shared engine
 module wrapping the 6a planner) → **6b.3** (closed-loop), resumed on the pod. Detail in [[planning]]
 "6b — RESULTS".
+
+## 2026-06-05 — Stage 6b.2: live engine smoke-test on the pod — PASS (LekiwiPlanner validated end-to-end)
+
+Ran the authored `lekiwi_engine.LekiwiPlanner` (fork `4720053`) end-to-end on an **H100** with **step-8000**,
+clearing the "engine authored, pod-test pending" flag. Drove the engine *directly* (no robot, no
+`scripts/lekiwi_mpc.py`) with raw `top` frames pulled from the dataset mp4 via pyav — **480×640×3 uint8**,
+exactly what `LeKiwiClient.get_observation()` returns — so the full live path executes: letterbox-preprocess
+→ SD-VAE encode → CEM (32×3×top-10, DDIM=3, H=3) → WM rollout → decode → `PlanResult`. Harness +
+artifacts: `results/smoke_6b2/` (`smoke_6b2.py`, PNGs) and `results/smoke_6b2_motion/`.
+
+**All four gates pass, on a static AND a moving goal:**
+1. **Action stats** = the integrate_se2 f=10 values (`mean=[0.0221,-0.0006]`, `std=[0.0141,0.0707]`) — match
+   6a's `run.log` exactly.
+2. **do_nothing sanity** (`plan(frame, frame)`): `dist_to_goal = 0.007–0.010 ≈ 0` (latent-L2 of a frame
+   against itself; confirms encode + objective wiring).
+3. **Goal is distinguishable & sign recovery is correct.** First pair (ep44 0→+30) happened to be
+   near-static, so CEM correctly returned ≈no motion (`vx≈0`, `+3.1°/s`) — honest but not a motion test. So
+   re-ran on a **moving** pair selected by scanning the parquet action stream for the largest 30-frame
+   window: **ep11 frame 504→534**, GT first chunk `vx=+0.100 m/s, θ=−24.4°/s` (forward + right turn, a 6a
+   "arc"). CEM recovered **`vx=+0.067 m/s, θ=−15.6°/s` — signs match exactly** (forward + CW), magnitudes
+   conservative (CEM under-drives large motion, consistent with WM under-prediction). `dist_to_goal=43.8` vs
+   do_nothing `0.007`.
+4. **Decoded `imagined` is a coherent top-view** (std≈55.6, not noise) — robot body / curtain / floor / lamp
+   all legible; on the moving pair the WM rollout under the plan visibly **advances + rotates right**, tracking
+   the goal's direction (residual goal gap = WM prediction error, per 6a).
+
+**The explicit-stats requirement (important for the 6b.3 launch).** The engine has two ways to obtain the
+`(Δx,Δθ)` denormalization stats it needs to convert CEM's normalized action into metric `(m, rad)`:
+its `__init__` first branch takes `action_mean`/`action_std` directly; otherwise it *reconstructs the val
+dataset* via `create_train_val_datasets` and reads `val._raw_action_mean/std`. **The reconstruction path is
+dead on the pod and must not be used for the live robot:**
+- `LeRobotDataset.__init__` calls `get_safe_version()` → `list_repo_refs()`, which **hits the HF Hub even with
+  a local `root`** to resolve the dataset's version ref. The source `kaushikpraka/wm-smallarea_nav30` is
+  **private → 401 Unauthorized** without a token (and the smoke box has none wired into the venv).
+- Even *with* a token it fails differently: the dataset is **codec v2.1**, and the installed **lerobot is v3.0,
+  which refuses to read v2.1** (`BackwardCompatibilityError`) — the exact wall 6b.1 hit and worked around by
+  reading parquet+mp4 directly. So the dataloader is not a viable stats source on this stack at all.
+- The stats are also **not stored in the checkpoint** (the cfg carries the dataset *name*, not the computed
+  normalization), so there is no offline fallback inside the ckpt.
+
+⇒ **the live controller MUST pass `action_mean=[0.022110389545559883, -0.0005879045929759741]`,
+`action_std=[0.014105414971709251, 0.07071184366941452]` explicitly** (the f=10 integrate_se2 values 6a
+derived and printed; the engine prints them back with an `expect ~[0.0221,-0.0006]/[0.0141,0.0707]` check).
+This is not a workaround — it's the intended on-robot config: the robot has **no dataset present**, so stats
+*must* be injected. The smoke-test was run in exactly this configuration, so it validates the real deployment
+path. **Action item for 6b.3:** `scripts/lekiwi_mpc.py --planner wm` (and `configs/planning/lekiwi.yaml`)
+must thread these two vectors into `LekiwiPlanner(...)`; getting a wrong/zero stat silently rescales every
+command (e.g. a missing `std` would zero the action) — so this is a hard precondition, not advisory.
+
+A wrong-sign or wrong-scale stat is the one mistake that would pass every cheap check and still drive the
+robot wrong, so it's pinned here and in [[roadmap]]/[[planning]]. **6b.2 passes — the engine module is
+validated on real GPU + real frames; 6b.3 (closed-loop on LeKiwi) is unblocked, gated only on the robot.**

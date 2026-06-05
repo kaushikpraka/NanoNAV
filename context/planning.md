@@ -428,6 +428,24 @@ the dead-reckoned plots). Key results:
   HF tag and bypass the version gate. Stored `theta.vel` confirmed rad/s.
 ⇒ the full `(Δx,Δθ)→velocity→robot` pipeline is grounded on hardware. Remaining: GPU-side live CEM (6b.2→6b.3).
 
+**6b.2 live engine smoke-test — ✅ DONE (2026-06-05, PASS).** `lekiwi_engine.LekiwiPlanner` (fork `4720053`)
+run end-to-end on an **H100** with **step-8000**, driven directly with raw 480×640×3 `top` frames (the full
+preprocess→encode→CEM 32×3×top-10 @ DDIM=3→rollout→decode path). All four gates pass: action stats =
+integrate_se2 f=10 values; `do_nothing` dist≈0; on a **moving** pair (ep11 504→534, GT `vx=+0.100, θ=−24.4°/s`,
+forward+right arc) CEM recovered the **correct signs** `vx=+0.067, θ=−15.6°/s` (magnitude conservative — WM
+under-drives large motion); decoded `imagined` is a coherent top-view that visibly advances + rotates right
+toward the goal. Harness/artifacts: `results/smoke_6b2*/`.
+
+> **6b.3 launch precondition (hard).** The live controller MUST pass `action_mean` / `action_std` to
+> `LekiwiPlanner` **explicitly** — `[0.022110389545559883, -0.0005879045929759741]` /
+> `[0.014105414971709251, 0.07071184366941452]` (the f=10 integrate_se2 stats). The engine's fallback that
+> rebuilds the val dataset to read these is **dead on the pod**: `LeRobotDataset` phones the HF Hub for the
+> version ref even with a local `root` (private repo → **401**), and installed **lerobot v3.0 can't read the
+> v2.1 codec** anyway (`BackwardCompatibilityError`); the stats are **not in the ckpt** either. This is the
+> intended on-robot config (no dataset present) — but a missing/zero `std` silently zeros every command, so
+> `scripts/lekiwi_mpc.py --planner wm` + `configs/planning/lekiwi.yaml` must thread these two vectors through.
+> Full detail in [[experiment-log]] "Stage 6b.2".
+
 ### Milestones
 - **6a — offline CEM eval — ✅ DONE (2026-06-04, PASS).** `src/sample/offline_planning_eval.py` +
   `configs/planning/lekiwi.yaml` (6b scaffold). 35 stratified val scenes × DDIM {20,5,3}: CEM beats
