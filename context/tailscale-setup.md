@@ -31,17 +31,21 @@ Facts confirmed on this pod (2026-06-05): sshd running, `AllowTcpForwarding` at 
 `port_zmq_observations=5556`. lerobot's client only ever *connects out* (PUSH cmd / SUB obs), so both ports
 ride the reverse tunnel — identical to the direct connect that worked in 6b.0/6b.1.
 
-**1. On the Mac** — keep this terminal open for the whole session. Get the `<ip> -p <port>` from the RunPod
-console → **Connect → SSH over exposed TCP** (NOT the `ssh.runpod.io` proxy — the proxy blocks `-R`/`-L`):
+**1. On the Mac** — keep this terminal open for the whole session. One command (`scripts/tunnel_up.sh`
+wraps the `ssh -R` with keepalives + autossh auto-reconnect; get `<ip> <port>` from the RunPod console →
+**Connect → SSH over exposed TCP**, NOT the `ssh.runpod.io` proxy — the proxy blocks `-R`/`-L`):
 ```bash
-ssh -N \
-  -R 5555:10.0.0.125:5555 \
-  -R 5556:10.0.0.125:5556 \
-  -o ServerAliveInterval=30 -o ServerAliveCountMax=3 \
+scripts/tunnel_up.sh --pod-host <pod-public-ip> --pod-port <pod-ssh-tcp-port>
+# (defaults: --pi-ip 10.0.0.125, --user root, reverse-forwards 5555 cmd / 5556 obs / 9876 rerun)
+```
+Equivalent raw command if you'd rather not use the helper:
+```bash
+ssh -N -R 5555:10.0.0.125:5555 -R 5556:10.0.0.125:5556 \
+  -o ServerAliveInterval=30 -o ServerAliveCountMax=3 -o ExitOnForwardFailure=yes \
   root@<pod-public-ip> -p <pod-ssh-tcp-port>
 ```
 (`ServerAliveInterval` keeps the tunnel warm during the ~8 s CEM compute, when no traffic flows, so NAT
-doesn't reap it. For auto-reconnect, wrap in `autossh` with the same flags.)
+doesn't reap it.)
 
 **2. On the pod** — the closed loop against the tunnelled robot (`--ip 127.0.0.1`):
 ```bash
