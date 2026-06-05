@@ -8,7 +8,9 @@ interface, so the SAME loop runs:
     descending distance, exercising the ENTIRE observe→plan→execute→terminate→telemetry +
     safety path on the real robot. This is how you validate the harness before paying for a pod.
   • ON THE POD with `--planner wm` — the real DiffusionWorldModel + CEMPlanner (Stage 6b.2
-    `lekiwi_engine.LekiwiPlanner`, in the fork) plans against a goal image at DDIM=3.
+    `lekiwi_engine.LekiwiPlanner`, in the fork) plans against a goal image at DDIM=3. The
+    integrate_se2 (Δx,Δθ) denorm stats are wired in as `--action-mean/--action-std` defaults
+    (the engine can't derive them on the pod — private-repo 401 + lerobot-v3-vs-v2.1; 6b.2).
 
 "Resume on the pod" is therefore a planner swap + a device/endpoint change, NOT a rewrite —
 the loop, the precise per-chunk timing, the velocity clamp, termination, and rerun telemetry
@@ -44,6 +46,17 @@ import lekiwi_common as lk
 
 DEFAULT_PI_IP = "10.0.0.125"
 DEFAULT_ROBOT_ID = "lekiwi"
+
+# integrate_se2 f=10 action stats — derived + printed by the 6a offline eval
+# (results/offline_planning_step8000/run.log) and confirmed by the 6b.2 engine smoke-test.
+# LekiwiPlanner denormalizes CEM's output to metric (Δx m, Δθ rad) with these, so they are a HARD
+# precondition for --planner wm: the engine's only other source is rebuilding the val dataset, which
+# is DEAD on the pod — LeRobotDataset phones the HF Hub for the version ref even with a local root
+# (private repo → 401) and lerobot v3.0 can't read the v2.1 codec; the stats are not in the ckpt either.
+# A wrong/zero std silently rescales (a zero std zeros every command). So they are wired in as the
+# default here and must travel with the checkpoint. See context/experiment-log.md "Stage 6b.2".
+INTEGRATE_SE2_ACTION_MEAN = [0.022110389545559883, -0.0005879045929759741]
+INTEGRATE_SE2_ACTION_STD = [0.014105414971709251, 0.07071184366941452]
 
 
 # --------------------------------------------------------------------------- planner interface
@@ -88,10 +101,20 @@ def make_planner(args):
     except Exception as e:
         sys.exit(f"[planner=wm] could not import lekiwi_engine from {args.nanowm_src}/sample: {e}\n"
                  f"  (6b.2 engine module — run on the pod where nanowm + the checkpoint live.)")
+    # Explicit action stats are mandatory on the pod (see INTEGRATE_SE2_ACTION_* above): the engine's
+    # dataset-rebuild fallback is dead here, and a zero/short std would silently zero or rescale every
+    # command. Validate hard before we ever move the robot.
+    a_mean, a_std = list(args.action_mean), list(args.action_std)
+    if len(a_mean) != 2 or len(a_std) != 2 or any(not np.isfinite(s) or s == 0.0 for s in a_std):
+        sys.exit(f"[planner=wm] need 2 finite, non-zero --action-std (got mean={a_mean}, std={a_std}); "
+                 f"a zero std silently zeros every command. Defaults are the integrate_se2 f=10 stats.")
+    print(f"[planner=wm] action stats mean={a_mean} std={a_std} "
+          f"({'default integrate_se2 f=10' if a_mean == INTEGRATE_SE2_ACTION_MEAN and a_std == INTEGRATE_SE2_ACTION_STD else 'CLI override'})")
     return LekiwiPlanner(
         ckpt=args.ckpt, device=args.device, ddim=args.ddim,
         num_samples=args.num_samples, opt_steps=args.opt_steps, topk=args.topk,
         horizon=args.horizon, n_elite_viz=args.elite_viz,
+        action_mean=a_mean, action_std=a_std,
     )
 
 
@@ -203,6 +226,13 @@ def main():
     ap.add_argument("--topk", type=int, default=10)
     ap.add_argument("--horizon", type=int, default=3)
     ap.add_argument("--elite-viz", type=int, default=3, help="top-K elite rollouts to decode for rerun")
+    ap.add_argument("--action-mean", type=float, nargs=2, default=INTEGRATE_SE2_ACTION_MEAN,
+                    metavar=("DX", "DTH"),
+                    help="integrate_se2 (Δx,Δθ) denorm mean for --planner wm (default = the f=10 stats; "
+                         "the engine can't derive these on the pod — see context/experiment-log.md 6b.2)")
+    ap.add_argument("--action-std", type=float, nargs=2, default=INTEGRATE_SE2_ACTION_STD,
+                    metavar=("DX", "DTH"),
+                    help="integrate_se2 (Δx,Δθ) denorm std for --planner wm (default = the f=10 stats)")
     # telemetry
     ap.add_argument("--rerun", action="store_true")
     ap.add_argument("--rerun-addr", default=None, help="viewer addr (Mac tailnet IP); default spawns local viewer")
