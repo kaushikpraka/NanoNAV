@@ -1,19 +1,76 @@
-# Tailscale bring-up — pod ↔ LeKiwi (Stage 6b.3)
+# Pod ↔ LeKiwi bridge (Stage 6b.3)
 
 Goal: let the **GPU pod** (NanoWM + CEM) reach the **LeKiwi Pi** (lerobot host, LAN `10.0.0.125`) so
 `scripts/lekiwi_mpc.py --planner wm` runs as the lerobot `LeKiwiClient` in the same process as the WM
-(the 6b design — no bespoke inference API). The pod and the robot are on different networks; Tailscale is
-the L3 mesh that bridges them so lerobot's ZMQ (cmd + observation ports) just works against the Pi.
+(the 6b design — no bespoke inference API). The pod and the robot are on different networks; this doc covers
+the options to bridge them so lerobot's ZMQ (cmd `5555` + observations `5556`) reaches the Pi.
 
 > **Status:** the pod can capture goals from the Mac today ([[planning]] 6b.4). The closed loop is gated on
 > this bridge. See [[roadmap]] Stage 6b, [[experiment-log]] 6b.2.
+>
+> **Recommended path = SSH reverse tunnel over RunPod's exposed TCP port** (below): no TUN, no new code,
+> reuses the validated pod-as-client design. The Tailscale paths are alternatives; kernel mode is **blocked**
+> on this pod (no `/dev/net/tun`).
 
 ---
 
-## ⚠️ Prerequisite (read first): the pod needs a TUN device
+## ✅ Recommended: RunPod TCP port + SSH reverse tunnel (no TUN, no code)
 
-Standard (kernel-mode) Tailscale creates a `tailscale0` network interface via `/dev/net/tun`. Apps then
-reach tailnet IPs (`100.x.y.z`) transparently — which is what lerobot's raw ZMQ needs.
+SSH needs no TUN, so this sidesteps the blocker entirely, and the pod stays the lerobot client exactly as
+6b.2/6b.3 validated — just pointed at `127.0.0.1`. The Mac (already on the LAN with the Pi, 6b.0/6b.1) dials
+into the pod over RunPod's SSH and **reverse-forwards** the two ZMQ ports back out to the Pi:
+
+```
+   Pod (GPU)                          Mac (dials out, on LAN)          Pi robot
+   lekiwi_mpc --ip 127.0.0.1   ──►   ssh -R 5555 / -R 5556    ──►   10.0.0.125:5555/5556
+   (connects to its own localhost)   (relays back over tunnel)       (lerobot lekiwi host)
+```
+
+Facts confirmed on this pod (2026-06-05): sshd running, `AllowTcpForwarding` at default `yes`, public IP
+`31.24.80.34`, `RUNPOD_POD_ID=ctmyc6ld7ht5zd`; lerobot `LeKiwiClientConfig` → `port_zmq_cmd=5555`,
+`port_zmq_observations=5556`. lerobot's client only ever *connects out* (PUSH cmd / SUB obs), so both ports
+ride the reverse tunnel — identical to the direct connect that worked in 6b.0/6b.1.
+
+**1. On the Mac** — keep this terminal open for the whole session. Get the `<ip> -p <port>` from the RunPod
+console → **Connect → SSH over exposed TCP** (NOT the `ssh.runpod.io` proxy — the proxy blocks `-R`/`-L`):
+```bash
+ssh -N \
+  -R 5555:10.0.0.125:5555 \
+  -R 5556:10.0.0.125:5556 \
+  -o ServerAliveInterval=30 -o ServerAliveCountMax=3 \
+  root@<pod-public-ip> -p <pod-ssh-tcp-port>
+```
+(`ServerAliveInterval` keeps the tunnel warm during the ~8 s CEM compute, when no traffic flows, so NAT
+doesn't reap it. For auto-reconnect, wrap in `autossh` with the same flags.)
+
+**2. On the pod** — the closed loop against the tunnelled robot (`--ip 127.0.0.1`):
+```bash
+cd /workspace/NanoNAV
+python scripts/lekiwi_mpc.py --planner wm \
+  --ip 127.0.0.1 \
+  --ckpt /workspace/results/20260603_160326-NanoWM-B-2-F4S10-lekiwi/checkpoints/across_timesteps/epoch=13-step=8000.ckpt \
+  --nanowm-src /workspace/NanoNAV/external/nanowm/src \
+  --goal goals/run1/goal.png
+```
+The integrate_se2 action stats are already wired as `--action-mean/--action-std` defaults (6b.3 pre-wiring),
+so this is turnkey. Optional rerun telemetry can stream to the Mac viewer over the same SSH (`-R 9876:...`).
+
+**Requirements / gotchas:**
+- Use the **direct TCP SSH** endpoint (exposed port → 22), not `ssh.runpod.io` (no forwarding there).
+- Your Mac's public key must be in the pod's `authorized_keys` (RunPod installs it if you added your SSH key).
+- `sshd_config` must keep `AllowTcpForwarding yes` (default; confirmed here).
+- Latency: observation frames go Pi→Mac (LAN)→internet→pod. Stop-and-plan pulls one frame per ~8–9 s cycle,
+  so it's a non-issue; lerobot already compresses camera frames over ZMQ.
+- This is **inbound-to-pod only** (RunPod TCP ports are inbound) — which is exactly why the Mac must be the
+  SSH *initiator* and use `-R` (reverse), letting the pod reach the Pi without the pod dialing out.
+
+---
+
+## ⚠️ Tailscale prerequisite: the pod needs a TUN device
+
+The Tailscale paths below are alternatives to the SSH tunnel. Kernel-mode Tailscale creates a `tailscale0`
+interface via `/dev/net/tun`, which apps then use to reach tailnet IPs (`100.x.y.z`) transparently — what
+lerobot's raw ZMQ needs.
 
 **This pod (as probed 2026-06-05) cannot do that out of the box:**
 ```
@@ -121,20 +178,19 @@ subtly wrong on the streaming-video port. **Treat as a stopgap; don't ship the l
 
 ---
 
-## Recommended alternative if TUN can't be enabled
+## Further fallback: flip the topology (Mac-as-client + pod inference server)
 
-Flip the topology instead of fighting userspace mode. The **Mac↔robot LAN path already works** (6b.0/6b.1,
-RTT ~15 ms) — so keep the lerobot client on the Mac and move only the *inference* across the network:
+Only if the SSH reverse tunnel is somehow unavailable AND TUN can't be enabled. Keep the lerobot client on the
+Mac (the **Mac↔robot LAN path already works**, 6b.0/6b.1, RTT ~15 ms) and move only the *inference* across:
 
-- **Mac** runs `lekiwi_mpc.py` as the lerobot client (no Tailscale needed for the robot — it's local LAN).
-- **Pod** runs a tiny WM inference server wrapping `LekiwiPlanner` (`plan(frame, goal) -> action + viz`).
-- The only cross-network hop is **Mac → pod, one TCP port**, tunneled via **RunPod's TCP proxy or an SSH
-  tunnel** (`ssh -L 8000:localhost:8000 <pod>`), so no TUN and no Tailscale-on-pod at all.
+- **Mac** runs `lekiwi_mpc.py` as the lerobot client (robot stays local LAN).
+- **Pod** runs a tiny WM inference server wrapping `LekiwiPlanner` (`plan(frame, goal) -> action + viz`),
+  exposed on a **RunPod TCP port** (inbound to the pod — the Mac connects in).
+- The Mac's planner becomes a thin `--planner remote` stub POSTing `(frame, goal)` to that port.
 
-Cost: a small remote-planner stub on the Mac + a server on the pod (the 6b spec avoided this by making the pod
-the client — but that assumed working kernel-mode Tailscale, which this pod can't provide). If TUN stays
-unavailable, this is less fragile than Path B and reuses the validated 6b.2 engine unchanged behind the server.
-Spec it as 6b.3-alt before building.
+Cost: a remote-planner stub on the Mac + a server on the pod — strictly more code than the SSH tunnel, which
+needs none. Prefer the SSH reverse tunnel; reach for this only if you want the pod fully decoupled from the
+robot's transport. Either way the validated 6b.2 engine is reused unchanged. Spec as 6b.3-alt before building.
 
 ---
 
