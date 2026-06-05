@@ -53,5 +53,6 @@ Progress, experiments, and decisions are tracked in **git** (this repo), not Obs
 - [[roadmap]] — Staged execution plan with current status
 - [[nanowm-integration]] — How the dataset plugs into NanoWM (concat vs integrate, v3.0→v2.1, the patch)
 - [[runpod-setup]] — Bring-up runbook for the pod-side agent (install, clone, build, launch)
+- [[tailscale-setup]] — Pod↔LeKiwi bridge for closed-loop 6b.3 (TUN prereq, kernel/userspace paths, fallback)
 - [[runpod-operator-guide]] — Runbook for the pod-side agent that babysits training
 - [[training-runs]] — Per-run training telemetry log

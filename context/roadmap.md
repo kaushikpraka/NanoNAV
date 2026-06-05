@@ -108,7 +108,11 @@ it for LeKiwi**: the `envs/` dir has no LeKiwi/dataset env. Plan (eval-grounded,
   precondition surfaced:** the live controller MUST pass `action_mean/std` explicitly — the engine's
   dataset-reconstruction fallback is dead on the pod (private-repo 401 + lerobot-v3-can't-read-v2.1) and the
   stats aren't in the ckpt; see [[experiment-log]] 2026-06-05) →
-  6b.4 goal capture → 6b.5 telemetry. Top trap: `theta.vel`
+  **6b.4 goal capture ✅ tool built** (`scripts/capture_goal.py`: snapshot the `top` frame → goal.png +
+  256² letterbox preview matching the planner; runs on the Mac, no GPU) → 6b.5 telemetry. **Closed-loop is
+  gated on the pod↔robot bridge** ([[tailscale-setup]]): the pod has **no `/dev/net/tun` and can't create it**
+  (not privileged), so kernel-mode Tailscale won't run as-is — needs a TUN-enabled pod (clean path), else the
+  userspace fallback (fragile for ZMQ) or the Mac-as-client + pod-inference-server alternative. Top trap: `theta.vel`
   deg/s↔rad/s (57× scale). **Develop locally for free** (all authoring + the no-model robot checks 6b.0/6b.1
   with the Mac as lerobot client on the LAN, stub-planner end-to-end test); **resume on the pod only for live
   CEM inference** (swap stub→real WM, Mac/LAN→RunPod/Tailscale — a config swap, not a rewrite). Full spec in
