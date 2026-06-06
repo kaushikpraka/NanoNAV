@@ -441,3 +441,43 @@ made `rr_init` **tee** telemetry to independent RecordingStreams so live + `.rrd
 (rerun 0.22 is single-sink per recording). Runbook updated in [[tailscale-setup]] ("Live rerun telemetry").
 **Next session:** bring tunnel + `--rerun-web` up, redo the run, watch why `dist` plateaus (WM under-drive vs
 goal too far for horizon 3 vs tunnel-drop truncation).
+
+## 2026-06-06 — Pixel-range bug found + fixed; convergence still open (range was necessary, not sufficient)
+
+**Live rerun — switched to the NATIVE viewer on a clean port (not the web viewer).** The `--rerun-web`
+path works (pod serves 9090/9877, browser only), but the user preferred the native rerun app. Root issue
+was never the app — it was the *port*: we'd pointed live at 9876, which collides with VS Code Remote-SSH.
+Fix is just a clean port: Mac runs `rerun --port 9999`, reverse-tunnels `ssh -N -R 9999:localhost:9999`,
+pod runs `--rerun-addr 127.0.0.1:9999`. (`connect_grpc` accepts bare `host:port`; confirmed both that and
+the `rerun+http://…/proxy` URL parse.) Added **`scripts/rerun_web_smoke.py`** — a standalone telemetry
+generator (moving scalar + live image) that exercises the exact serve/connect path with NO robot, so live
+viz can be validated independently; `--rerun-addr host:port` uses the native path, else serves web.
+
+**Root-caused the non-convergence to a pixel-range mismatch — and fixed it.** Training normalizes pixels to
+**[-1,1]** (`wm_datasets/world_model_dataset.py:664`, `video = video*2-1`, `normalize_pixel=True` default),
+but the on-robot engine `sample/lekiwi_engine.py:_preprocess` fed the VAE **[0,1]** (its comment matched the
+lerobot loader's [0,1] output but missed the `*2-1` the dataset applies on top). So every observed frame and
+the goal were encoded in a range the VAE/WM never trained on → `z0`/`z_goal` off-distribution → `dist_to_goal`
+meaningless and CEM had no real descent direction. **Fix:** `_preprocess` now pads in [0,1] (black borders
+stay 0) then applies `*2-1` last — matching the dataset's pad-then-normalize order (borders → -1). Both `z0`
+(plan) and `z_goal` (`_goal`) flow through it; decode (`decode_latents`, `(x+1)/2`) is the unaffected inverse.
+
+**Re-ran nearfan (full speed, execute, fixed range) — STILL does not converge.** Over ~13 steps `dist`
+sat at **51 ± 0.5, completely insensitive to the (varied) commands**; θ oscillated sign every step (robot
+wiggles in place rather than committing to a heading). The range fix only shifted the absolute scale
+(~47 → ~51) — it was **necessary but not sufficient**. Two structural notes feeding the diagnosis: per-chunk
+motion is *tiny* (x≈0.05 m/s × CHUNK_DT 0.333 s ≈ 1.6 cm; θ a few deg/step), so even correct planning moves
+the scene very little per step; and the **execution horizon is 1** (`lekiwi_engine.py:179` "FIRST chunk only,
+execute-one replan"), planning **H=3**. Conclusion reached with the user: bumping *execution* horizon won't
+help convergence (less feedback, not more reach); bumping *planning* H past the ~3-chunk train window is free
+(`lekiwi_engine.py:84` rolls out autoregressively) but optimizes against degrading WM predictions — reliable
+long-horizon planning needs **retraining**. The flat, action-insensitive `dist` now points at the WM not
+giving CEM a usable gradient (goal beyond H=3 reach and/or under-responsive dynamics), NOT at preprocessing.
+
+**Prefs:** user set "always run execute at full `--speed-scale 1.0`" (saved to memory). Telemetry captured to
+`/workspace/results/mpc_nearfan_fix.rrd` (range-fixed, 13 steps) + earlier `mpc_nearfan_exec_full.rrd`.
+
+**Open / next:** convergence is the live question. Probe whether CEM's *imagined* `dist` actually drops for
+any action (is there a descent direction at all, or is the loss flat?); check if nearfan is simply beyond
+H=3 reach (try a goal 1–2 chunks away, or larger per-chunk action magnitude / step-dx); consider waypoints or
+a longer-horizon retrain. The `--reach-thresh` also needs recalibration to the new [-1,1] `dist` scale.

@@ -114,9 +114,16 @@ it for LeKiwi**: the `envs/` dir has no LeKiwi/dataset env. Plan (eval-grounded,
   stats, sane CEM commands, ~7.5 s/plan @ DDIM=3, stop-and-plan loop executed) but **did NOT converge**
   (`dist_to_goal` ~44–46 over 22 steps, reach-thresh 35) and the **Pi host + SSH tunnel dropped mid-run**;
   rerun live-viz fixed via **`--rerun-web`** (pod-hosted web viewer, 9090/9877) after the `-R 9876` path
-  collided with VS Code's Mac port — `.rrd` captured. Next: redo with live viz + diagnose the `dist` plateau
-  (WM under-drive vs goal beyond horizon-3 reach vs the truncated run). See [[experiment-log]] 2026-06-05,
-  [[tailscale-setup]] "Live rerun telemetry". → 6b.5 telemetry. **Closed-loop needs a
+  collided with VS Code's Mac port — `.rrd` captured. **2026-06-06 update:** found + fixed a **pixel-range
+  bug** — `lekiwi_engine._preprocess` fed the VAE [0,1] but training uses [-1,1] (`*2-1`,
+  `world_model_dataset.py:664`); re-ran nearfan (full speed) and `dist` **still flat (~51, action-insensitive),
+  θ oscillating** — range fix was necessary but NOT sufficient. Convergence now points at the WM not giving
+  CEM a usable gradient (goal beyond H=3 reach and/or under-responsive dynamics), not preprocessing. Live viz
+  also moved to the **native viewer on clean port 9999** (`--rerun-addr 127.0.0.1:9999` + `rerun --port 9999`
+  + `-R 9999`), with `scripts/rerun_web_smoke.py` to test telemetry without the robot. Next: probe CEM's
+  imagined-`dist` for any descent direction; try a 1–2-chunk goal / larger per-chunk action; recalibrate
+  `--reach-thresh` to the new [-1,1] scale; consider waypoints or a longer-horizon retrain. See
+  [[experiment-log]] 2026-06-06, [[tailscale-setup]] "Live rerun telemetry". → 6b.5 telemetry. **Closed-loop needs a
   pod↔robot bridge** ([[tailscale-setup]]): **recommended = SSH reverse tunnel over RunPod's exposed TCP/SSH
   port** (`ssh -N -R 5555/-R 5556` from the Mac → pod runs `lekiwi_mpc.py --planner wm --ip 127.0.0.1`) — no
   TUN, no new code, reuses the validated pod-as-client path. Tailscale kernel mode is **blocked** (pod has no
