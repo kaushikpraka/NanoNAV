@@ -541,3 +541,38 @@ displacement curve — if it steepens, the camera was a primary cause.
 — the `imagined` panel now shows the **+1 chunk the robot actually executes** (was wrongly the +H endpoint,
 the most autoregressively-degraded frame) plus a `rollout/h1..hH` filmstrip; flat single-row rerun blueprint
 (the nested 2-row layout wedged the web viewer). See [[lekiwi-wm-camera-objective-conditioning]].
+
+## 2026-06-08 (later) — CORRECTION: radial conditioning is FINE; the camera is NOT the bottleneck (controlled sweep refutes the "flat landscape" claim)
+
+The camera-aliasing / "flat latent landscape" conclusion above is **WRONG** — it was built on a confounded
+number. Re-measured with a controlled tool (`scripts/measure_dist_sweep.py`: hand-place the robot at marked
+displacements along the goal axis, read latent-L2 + pixel-L1 to goal, plus a same-pose noise burst; NO
+motion). Results (`/workspace/results/dist_sweep/curve.png`):
+
+| displacement | latent_L2 | pixel_L1 | same-pose noise σ |
+|---|---|---|---|
+| 0 cm | 42.47 | 26.36 | 0.09 / 0.008 |
+| 10 cm | 42.47 | 25.87 | 0.13 / 0.017 |
+| 20 cm | 40.72 | 23.07 | 0.13 / 0.045 |
+| 30 cm | 37.84 | 20.07 | 0.10 / 0.012 |
+| 40 cm | 34.46 | 17.82 | 0.15 / 0.029 |
+
+- **−8.0 latent / −8.5 pixel over 40 cm, monotonic**, noise σ only ~0.12 latent / ~0.02 pixel → **SNR ≈ 17/10 cm
+  (latent), ≈ 97/10 cm (pixel)**. The objective is **well-conditioned along the radial approach axis** — not
+  flat, not aliased. The wide-angle camera encodes pose just fine here.
+- **Why the earlier "46 cm → 0.3 change" was an artifact:** the `--drive-straight` robot was drifting
+  *off-course*, so those 46 cm were path-length while it stayed ~equidistant — never a radial approach. When
+  the operator nudged it *onto* the axis, dist fell straight into the steep part of this curve (44→32.8). So
+  "flat far / camera information-limited" is **retracted**.
+- **NEW anomaly (matters):** the operator moved *away* from the believed goal, yet dist *decreased*, and the
+  minimum (34.5 @ 40 cm) never reached the ~32 "reached" value → **`goals/nearfan.png` corresponds to a pose
+  ~50 cm BEHIND the operator's "0 cm/at-goal" reference.** Likely a **goal-image ↔ intended-pose mismatch**:
+  closed-loop may have been correctly driving toward the nearfan-capture pose, not where we thought the goal
+  was. Verify by re-capturing the goal *at* the intended pose (or checking what nearfan.png actually depicts).
+
+**Revised diagnosis:** camera radial info is good → the closed-loop failure is **off-axis**: the robot can't
+*stay on* the radial axis (heading drift + CEM commanding turns push it laterally, where distance-to-goal is
+geometrically ~flat — that's the "flat ~42" we kept seeing), and/or a goal-pose mismatch. **Next:** yaw sweep
+(robot self-rotates in place in fixed increments, measure dist vs angle) + lateral sweep, to test the
+heading/lateral conditioning the robot actually wanders in. The general **camera ⊗ objective** principle still
+holds as a design lesson, but for THIS rig the camera is not the limiter.

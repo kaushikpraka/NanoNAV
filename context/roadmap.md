@@ -132,7 +132,17 @@ it for LeKiwi**: the `envs/` dir has no LeKiwi/dataset env. Plan (eval-grounded,
   reachable), NOT broken dynamics, NOT DDIM. Generalizes to image-distance objectives + distant scenes +
   translation goals. **Fixes:** waypoints (≤2–3 chunks, no retrain) → undistort+center-crop view (retrain) →
   mask robot body → denser/learned objective. See [[experiment-log]] 2026-06-08,
-  [[lekiwi-wm-camera-objective-conditioning]]. Earlier next-steps (still valid for the basin/objective work): probe CEM's
+  [[lekiwi-wm-camera-objective-conditioning]].
+  **2026-06-08 (later) — CORRECTION: the camera-aliasing claim above is RETRACTED.** A controlled
+  displacement sweep (`scripts/measure_dist_sweep.py`, hand-placed, no motion) shows the objective is
+  **well-conditioned radially**: latent-L2 −8.0 / pixel-L1 −8.5 over 40 cm, monotonic, same-pose noise σ ~0.12
+  / ~0.02 → **SNR ≈ 17 (latent) / ≈ 97 (pixel) per 10 cm**. The earlier "flat ~42 / 0.3-change" was an artifact
+  of the `--drive-straight` robot going *off-course* (path-length, not radial approach). Camera radial info is
+  fine. **New anomaly:** moving *away* from the believed goal *decreased* dist (min 34.5 @ 40 cm, never ~32) →
+  `nearfan.png` ≈ a pose ~50 cm *behind* the "0 cm" reference (**goal-image ↔ intended-pose mismatch** to
+  verify). **Revised:** failure is **off-axis** (robot can't hold the radial axis; lateral drift keeps dist
+  ~flat) and/or goal mismatch — NOT the camera. Next: yaw + lateral sweeps. See [[experiment-log]] 2026-06-08 (later).
+  Earlier next-steps (still valid for the off-axis/objective work): probe CEM's
   imagined-`dist` for any descent direction; try a 1–2-chunk goal / larger per-chunk action; recalibrate
   `--reach-thresh` to the new [-1,1] scale; consider waypoints or a longer-horizon retrain. See
   [[experiment-log]] 2026-06-06, [[tailscale-setup]] "Live rerun telemetry". → 6b.5 telemetry. **Closed-loop needs a
