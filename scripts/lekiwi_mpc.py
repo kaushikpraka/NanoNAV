@@ -114,7 +114,7 @@ def make_planner(args):
         ckpt=args.ckpt, device=args.device, ddim=args.ddim,
         num_samples=args.num_samples, opt_steps=args.opt_steps, topk=args.topk,
         horizon=args.horizon, n_elite_viz=args.elite_viz,
-        action_mean=a_mean, action_std=a_std,
+        action_mean=a_mean, action_std=a_std, var_scale=args.var_scale,
     )
 
 
@@ -342,6 +342,9 @@ def main():
     ap.add_argument("--opt-steps", type=int, default=3)
     ap.add_argument("--topk", type=int, default=10)
     ap.add_argument("--horizon", type=int, default=3)
+    ap.add_argument("--var-scale", type=float, default=1.0,
+                    help="CEM initial sampling std × dataset action-std (1.0=in-distribution; >1 widens "
+                         "exploration incl. stronger rotations, at the cost of more out-of-distribution actions)")
     ap.add_argument("--elite-viz", type=int, default=3, help="top-K elite rollouts to decode for rerun")
     ap.add_argument("--action-mean", type=float, nargs=2, default=INTEGRATE_SE2_ACTION_MEAN,
                     metavar=("DX", "DTH"),
