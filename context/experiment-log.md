@@ -576,3 +576,48 @@ geometrically ~flat — that's the "flat ~42" we kept seeing), and/or a goal-pos
 (robot self-rotates in place in fixed increments, measure dist vs angle) + lateral sweep, to test the
 heading/lateral conditioning the robot actually wanders in. The general **camera ⊗ objective** principle still
 holds as a design lesson, but for THIS rig the camera is not the limiter.
+
+## 2026-06-08 (resolution) — FIRST closed-loop convergence (REACHED ×2); both prior "root causes" were over-reach; the remaining open question is basin catchment, NOT the camera
+
+**Headline: the closed-loop WM controller converges on the real robot.** Two clean runs toward a freshly
+captured goal (`goals/nearfan2/goal.png`), step-12000, full speed, `--planner wm`:
+- reach-thresh 35 → monotone-ish descent 41 → **REACHED 34.99** in 10 steps (`mpc_nearfan2_execute.rrd`).
+- reach-thresh 25 → 40 → **REACHED 21.82** in 14 steps, with a sharp final dive 28.7→21.8 into the basin
+  (near the ~16 floor) (`mpc_nearfan2_thresh25.rrd`).
+The WM dynamics, CEM search, latent-L2 objective, the wide-angle camera, and DDIM=3 are all **vindicated** —
+nothing in the stack is broken. Both big mid-session conclusions (camera-aliasing; then global
+basin-of-attraction) were over-reach.
+
+**Diagnostic chain that got here:**
+1. Radial sweep (`scripts/measure_dist_sweep.py`, hand-placed, no motion): latent −8/40 cm monotonic, SNR
+   ~17–97 → metric well-conditioned radially (killed camera-aliasing).
+2. Yaw sweep (`--yaw-sweep`, robot self-rotates in place): a **clean sharp basin** in heading exists — the
+   metric senses heading fine — but for the OLD goal the basin was shallow (depth 14, min 38) and sat at a
+   pose offset from where we aimed.
+3. Re-captured the goal at the robot's actual pose (`nearfan2`): yaw basin became **deep + sharp** — min
+   **latent 16.3 / pixel 3.6** (near-perfect match), depth 33 (vs 14). pixel_L1 3.6 ⇒ the live frame ≈ the
+   goal frame at that pose.
+4. Closed loop toward `nearfan2` → REACHED ×2 (above).
+
+**What is CONFIRMED:** the metric/WM/CEM/camera are healthy; the closed loop converges when the goal is
+**within the basin catchment**. The objective has a sharp deep basin (steep within ~±10° heading / the
+near-field radius) surrounded by a flat ~40–50 plateau.
+
+**What is NOT settled (operator flag — do not overclaim "mislocated goal"):** `nearfan2` was captured *at the
+robot's own pose*, so it is an **easy/close** goal already near the catchment. `nearfan` is still a **valid**
+goal — its non-convergence may be because it is genuinely **farther / outside the catchment** (the real, open
+basin-of-attraction limit), NOT because it was "wrong." The sweeps showed `nearfan`'s best-match pose is
+offset from where we *thought* the goal was, but that is consistent with either (a) a capture-pose mismatch OR
+(b) a legitimately farther goal. **Unresolved.**
+
+**Open question → next experiments:** (a) re-run `nearfan` (unchanged) with the robot started *near nearfan's
+actual basin* (low starting dist) — if it converges, `nearfan` is fine and the issue was just start-outside-
+catchment; (b) **map the catchment radius** — how far / how misaligned a start still converges; (c) for starts
+*outside* the catchment (far goals), the flat plateau is the real blocker → a **learned temporal-distance
+metric + model-imagined subgoals** is the lever to extend reach (the "plan fully in the WM, no manual
+waypoints" path). `--reach-thresh` recalibrated: with a correct goal the basin floor is ~16, plateau ~45, so
+25–30 is a sensible threshold (35 only grazes the basin edge).
+
+**Tooling added + committed this session:** `measure_dist_sweep.py` (+`--yaw-sweep`), `--drive-straight`,
+imagined `+1`/filmstrip viz, flat single-row blueprint, offline-eval live-metrics print. Sweeps:
+`/workspace/results/{dist_sweep,yaw_sweep,yaw_sweep2}/curve.png`.

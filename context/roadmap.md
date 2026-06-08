@@ -142,6 +142,19 @@ it for LeKiwi**: the `envs/` dir has no LeKiwi/dataset env. Plan (eval-grounded,
   `nearfan.png` ≈ a pose ~50 cm *behind* the "0 cm" reference (**goal-image ↔ intended-pose mismatch** to
   verify). **Revised:** failure is **off-axis** (robot can't hold the radial axis; lateral drift keeps dist
   ~flat) and/or goal mismatch — NOT the camera. Next: yaw + lateral sweeps. See [[experiment-log]] 2026-06-08 (later).
+  **2026-06-08 (resolution) — FIRST CLOSED-LOOP CONVERGENCE (REACHED ×2).** Yaw sweep confirmed a clean sharp
+  heading basin (metric senses heading fine). Re-captured the goal at the robot's actual pose (`nearfan2`) →
+  basin deep+sharp (min latent **16.3** / pixel **3.6**, depth 33). Closed loop toward `nearfan2` (step-12000,
+  full speed): reach-thresh 35 → **REACHED 34.99** (10 steps); reach-thresh 25 → **REACHED 21.82** (14 steps,
+  sharp final dive into the basin). **WM/CEM/objective/camera/DDIM all vindicated** — both prior "root causes"
+  (camera-aliasing, basin-of-attraction) were over-reach. CONFIRMED: closed loop converges when the goal is
+  inside the basin catchment. **NOT settled (don't overclaim "mislocated goal"):** `nearfan2` was captured at
+  the robot's own pose = easy/close; `nearfan` is still a **valid** goal whose non-convergence may be
+  start-outside-catchment (a genuinely farther goal), not a wrong image. **Open → next:** re-run `nearfan` from
+  a start near its basin; map catchment radius; for far/outside-catchment starts the flat plateau is the real
+  blocker → **learned temporal-distance metric + model-imagined subgoals** (the "plan fully in WM, no manual
+  waypoints" path). `--reach-thresh` 25–30 sensible (basin floor ~16, plateau ~45). See [[experiment-log]]
+  2026-06-08 (resolution). 6b.3 closed-loop: **working** ✅ (within catchment).
   Earlier next-steps (still valid for the off-axis/objective work): probe CEM's
   imagined-`dist` for any descent direction; try a 1–2-chunk goal / larger per-chunk action; recalibrate
   `--reach-thresh` to the new [-1,1] scale; consider waypoints or a longer-horizon retrain. See
