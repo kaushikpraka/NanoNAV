@@ -187,7 +187,38 @@ environment is landmark-rich (low aliasing) so the baseline has a real shot; exp
 and flat cross-region → localizes where QRL is needed. **Next = encode-cache + sweep eval + rung-0; the
 sweep grade is the GO/NO-GO gate.** Full design + pitfalls: [[learned-distance-metric]].
 
+**REVISED (2026-06-09, research session — literature stress-test of the plan).** Direction confirmed
+(temporal distance + graph is the field's convergent recipe: ViNG/GNM/ViNT/NoMaD all use a
+temporal-distance head; nobody plans room-scale on raw latent distance), with four changes:
+(1) **rung-1 head: QRL dual-ascent → contrastive / MC-fitted quasimetric** (OGBench arXiv:2410.20092:
+QRL ~0% on all visual tasks; the stitching it's bought for is what the graph provides anyway; CRL/
+Contrastive-Successor-Features/MQL are the evidence-backed escalations); (2) **Phase 0 adds
+zero-training frozen-embedding arms to the sweep harness** — DINOv2 *patch* distance is a serious
+candidate (DINO-WM plans top-down nav with exactly that cost; pooled/CLS and VIP are contraindicated)
+and the arm ranking doubles as codec selection for any semantic-latent retrain; (3) **complementary
+tracks added:** GCBC-with-hindsight as a CEM proposal prior (gradient where L2 is flat + keeps rollouts
+in-distribution), MASt3R-SLAM pose oracle (eval-only; closes the metric's verification gap),
+recollection co-designed for WM+metric+graph; (4) numeric **Gates A/B** before anything downstream.
+Phased plan + evidence: [[learned-distance-metric]] "Sequencing" / "Rung-1 head — REVISED"; execution:
+[[roadmap]] 6d.
+
 ## Future Extensions
+
+### Semantic-latent WM retrain (DINOv2 / V-JEPA 2.1 + regression predictor) — Finding #4 REINTERPRETED (2026-06-09)
+nanowm's Finding #4 ("DINO/V-JEPA fail at action conditioning") is evidence about **diffusion-forcing ⊗
+semantic latents, not semantic latents per se**: every published success with frozen semantic features
+uses a **deterministic teacher-forced regression predictor** (DINO-WM arXiv:2411.04983: MSE, actions per
+patch token; V-JEPA 2-AC arXiv:2506.09985: L1 + rollout loss; DINO-world arXiv:2507.19468) or
+x0-prediction (V-JEPA 2.1 nav WM, arXiv:2603.14482). Mechanism: semantic features are temporally smooth
+→ the denoiser scores well by copying context → action branch starves; SD-VAE's per-step texture
+variance is what kept ours alive. Why it matters here: semantic latents preserve action geometry
+*better* under regression (arXiv:2605.06388), and regression predictors **degrade to benign averaging
+OOD instead of snapping to vivid wrong training scenes** — directly relevant to the live-frame
+hallucination blocker above. Decision point = the coverage retrain; Gate A's frozen-arm sweep ranking
+([[learned-distance-metric]]) doubles as the codec choice. A codec swap alone (`latent_codec=webdino|
+vjepa2_1` under diffusion-forcing) would just reproduce Finding #4. The metric/graph stack transfers
+(φ retargets; harness/graph are latent-agnostic). Costs: predictor-objective change in nanowm + a small
+viz decoder (SD-VAE's free decodability is lost).
 
 ### Pattern B (goal-conditioned video generation + IDM)
 Same data, same encoder. Replace action conditioning with goal-image conditioning. Train separate IDM on action-labeled data. Compare Pattern A vs Pattern B on same scene. Analytic optical-flow IDM baseline (AVDC-style, zero labels).

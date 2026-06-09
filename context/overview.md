@@ -34,7 +34,7 @@ Progress, experiments, and decisions are tracked in **git** (this repo), not Obs
 
 - **Architecture:** Pattern A — action-conditioned forward model + CEM/MPC planning (not Pattern B video-as-plan + IDM)
 - **Backbone:** NanoWM-B/2 (160M params)
-- **Latent space:** SD-VAE [4, 32, 32] — action-sensitive, decodable for visualization. DINO/V-JEPA fail at action conditioning (Finding #4)
+- **Latent space:** SD-VAE [4, 32, 32] — action-sensitive, decodable for visualization. DINO/V-JEPA fail at action conditioning (Finding #4 — **reinterpreted 2026-06-09:** the failure is diffusion-forcing ⊗ semantic latents, not the latents; semantic latents + a *regression/x0* predictor is a credible retrain option, see [[open-questions]] "Semantic-latent WM retrain" + [[learned-distance-metric]])
 - **Action representation:** Body-frame pose delta (Δx, Δθ), 2D. Integrated from f=5 velocity commands per chunk. Δy dropped (negligible at chunk timescales)
 - **Camera:** Elevated third-person (~55° tilt) mounted on robot arm structure. Captures robot body (fixed reference), near floor, mid objects, far walls
 - **Control:** Unicycle model, 2-DOF (v_x, ω). No strafe. Exact kinematics for pose tracking

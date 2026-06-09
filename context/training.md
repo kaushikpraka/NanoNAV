@@ -5,7 +5,7 @@
 | Parameter | Value | Source |
 |---|---|---|
 | Backbone | NanoWM-B/2 (160M params) | Paper default for planning |
-| Latent space | SD-VAE (stabilityai/sd-vae-ft-mse) [4, 32, 32] | Action-sensitive (Finding #4) |
+| Latent space | SD-VAE (stabilityai/sd-vae-ft-mse) [4, 32, 32] | Action-sensitive (Finding #4; reinterpreted 2026-06-09 — diffusion-forcing-specific, see [[open-questions]] "Semantic-latent WM retrain") |
 | Patch size | 2 → 16×16 = 256 spatial tokens/frame | Paper naming convention |
 | Objective | v-prediction | Best FID (paper finding) |
 | Schedule | Squared-cosine + ZTSNR | Paper default |

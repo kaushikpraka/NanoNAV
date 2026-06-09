@@ -779,3 +779,111 @@ raw SD-VAE latent-L2 planning objective with a **learned quasimetric distance**.
   All buildable/validatable **offline now**, independent of the retrain (which only gates the on-robot
   far-goal payoff). See [[learned-distance-metric]], [[roadmap]] 6d, [[open-questions]] "Scoring function
   alternatives".
+
+## 2026-06-09 (research session) — Plan stress-tested vs the literature: rung-1 head REVISED (QRL → contrastive), zero-training frozen-embedding arms added, phased plan with Gates A/B
+
+Ran a multi-agent literature review over the planner-improvement plan ("is MLP → quasimetric right, or
+are there better routes?"). **Direction confirmed; one component replaced; three cheap tracks added.**
+All design changes folded into [[learned-distance-metric]]; execution into [[roadmap]] 6d.
+
+**Confirmed by the literature:**
+- **Temporal-distance head + topological graph is THE field-proven recipe** for room-scale image-goal
+  nav from small offline data — ViNG (arXiv:2012.09812) ran real robots on exactly our rung-0 recipe
+  (temporal regression + cross-trajectory negative mining + graph); GNM/ViNT/NoMaD kept the distance
+  head at much larger scale. Nobody plans room-scale on raw latent distance: NWM (arXiv:2412.03572)
+  uses LPIPS + reports our exact OOD mode-collapse at 1B params; DINO-WM / V-JEPA-2-AC keep horizons
+  short. Flat-far-from-goal + OOD hallucination are *acknowledged, unsolved* properties of pure WM
+  planning — the field's answer is external structure (graph), i.e. our 6d shape is right.
+- **Graph promoted in framing:** not just "for far goals" — it's the component that keeps every module
+  in its comfort zone (WM: short rollouts from real frames; metric: short well-covered pairs; CEM:
+  in-basin). Effort goes to **edge hygiene** (conservative τ, ensemble-disagreement filtering, SGM-style
+  edge deletion on failed hops — SGM: a *single* bad edge wrecks planning), not metric structure.
+
+**REVISED — rung-1 head: QRL/IQE dual-ascent is OUT, contrastive / MC-quasimetric is the escalation.**
+OGBench (arXiv:2410.20092): QRL ~0% on **every visual task** (dominates only state-based mazes); four
+2025 follow-ups (TMD/Eikonal-QRL/ProQ/MQL) exist specifically to fix the dual-ascent instability ⇒
+structural, not tuning; no real-robot/image-nav use found. And the property QRL is bought for —
+triangle-inequality stitching — is exactly what the rung-2 graph + Dijkstra provides explicitly.
+Replacements (in order): **CRL** InfoNCE on temporal proximity (94% where QRL gets 0%; Stable-CRL
+arXiv:2306.03346 has the real-robot recipe) → **Contrastive Successor Features** (arXiv:2406.17098) or
+**MQL** (arXiv:2511.07730, MC-fitted quasimetric, no min-max). IQE survives only as a head
+parameterization if the rung-0 symmetric-vs-asymmetric ablation shows directionality matters.
+
+**ADDED — Phase-0 zero-training frozen-embedding arms** on a distance-agnostic sweep harness:
+**DINOv2 *patch* distance is the serious candidate** — DINO-WM (arXiv:2411.04983) plans CEM on exactly
+that cost on top-down nav with the agent in frame (Wall 0.96), and its ablation kills pooled features
+(CLS 0.58); corroborated by arXiv:2507.01667 (global embeddings ≈ no relative pose). **No paper has
+measured monotonicity at 0–60 cm robot scale** (VPR is 10–25 m retrieval; DINOv2 rotation-invariance is
+a heading risk) — so our sweep measures what the literature hasn't. **VIP expected to lose** (double-OOD;
+GVL finds embedding-distance values near-random OOD; pooled). Mechanistic prior for why patch-DINO ≠
+flat where spatial SD-VAE-L2 is: VAE cells encode appearance stats (carpet/wall cells dominate), DINO
+patches encode landmark *identity* at grid positions. V-JEPA 2.1 token arm included (codec already in
+nanowm); **the arm ranking doubles as codec selection for any semantic-latent retrain.**
+
+**ADDED — complementary tracks:** (1) **GCBC proposal prior for CEM** (GCSL/RvS; hindsight relabeling →
+millions of tuples from 45K frames; gradient where L2 is flat + biases CEM toward in-distribution action
+sequences = less WM hallucination exposure); (2) **MASt3R-SLAM pose oracle, eval-only**
+(arXiv:2412.12392; poses for all 45K frames → grade d_learned globally, catch wormholes at graph build —
+closes pitfall #8's verification gap); (3) **recollection co-design** for WM+metric+graph (perimeter
+coverage, loop closures through the rug centre, both approach directions, slow approaches, exposure/WB
+lock + udev camera pin first).
+
+**Finding #4 REINTERPRETED (JEPA question):** the DINO/V-JEPA action-conditioning atrophy is evidence
+about **diffusion-forcing ⊗ semantic latents**, not the latents — every published semantic-latent WM
+success uses deterministic regression (DINO-WM MSE / V-JEPA-2-AC L1+rollout / DINO-world) or
+x0-prediction (V-JEPA 2.1 nav WM). Mechanism: temporally-smooth features → denoiser copies context →
+action starves (SD-VAE's texture flicker kept ours alive). Bonus directly relevant to the live-frame
+blocker: regression predictors **degrade to benign averaging OOD** instead of snapping to vivid wrong
+scenes (our nearhamper failure; arXiv:2605.06388 also shows semantic latents preserve action geometry
+*better* under regression: IDM corr 0.83 vs 0.51 VAE). Retrain decision point = the coverage retrain;
+recorded in [[open-questions]] "Semantic-latent WM retrain".
+
+**Phased plan with numeric gates** (full detail [[learned-distance-metric]] "Sequencing"): Phase 0 =
+latent cache + harness + frozen arms → **Gate A** (ρ>0.9 to 60 cm radial+lateral, slope>3σ at 40–60 cm,
+yaw basin preserved); Phase 1 = rung-0 (+distillation variant if DINO wins Gate A) → **Gate B**
+(GO/NO-GO); Phase 2 = swap into `lekiwi_engine` + on-robot A/B on well-covered goals; Phase 3 = graph;
+parallel = GCBC / SLAM oracle / recollection. **Order of attack: Phase 0 first — highest
+information-per-hour; everything downstream branches on its result.**
+
+## 2026-06-09 (build session) — Phase 0 CODE BUILT: sweep harness + frozen candidates + latent cache + imagined arm (smoke-tested)
+
+Implemented all of Phase 0 (five tools, `scripts/`), smoke-tested locally end-to-end. **No training
+anywhere — all candidates are formulas or frozen pretrained nets; the work is measurement.**
+
+- **`sweep_common.py`** — the single source of truth three consumers import: (1) **letterbox/normalize
+  exactly replicating `LekiwiPlanner._preprocess`** (torch bilinear `align_corners=False`, pad 0 in
+  [0,1], then `*2−1`) — the 6b pixel-range-bug class is closed by construction; (2) the **sweep label
+  grammar** (labels carry ground-truth pose: `r<cm>`, `lat±cm`, `yaw±deg`, `yawd±deg@r<cm>`,
+  `g_r<cm>_b±deg`, `fork_<site>_<move>`, `noise`; legacy `<N>cm`/`yaw+10` accepted); (3) sweep-dir
+  manifest IO (legacy `measure_dist_sweep.py` dirs auto-ingest, pod-absolute paths rebase — verified).
+- **`capture_sweep.py`** — **GPU-free** robot-side capture (decouples capture from scoring; the old
+  tool needed the WM+pod just to capture). Interactive labeled captures + bursts + goal snapshot +
+  protocol/coverage helpers + the motorized yaw arm ported from `measure_dist_sweep.py`. Protocol
+  documents the full Gate-A session (~50–60 placements incl. **lateral out to ±60 cm** — the far band
+  is gated, not just small offsets).
+- **`dist_harness.py`** — distance-agnostic grader. Per candidate × arm: Spearman ρ, far-band (40–60 cm)
+  slope-per-10cm/σ, yaw-basin (argmin at center + depth/σ), yaw-at-distance (the under-credited-rotation
+  check), grid ρ, fork rankings (margin/σ), noise σ as the universal denominator → **Gate A verdict** +
+  `gate_report.md` + `metrics.csv` + per-candidate curve CSVs + clean-vs-imagined overlay plots.
+  **Smoke-tested both paths on a synthetic sweep:** a saturating (plateau-like) signal correctly FAILs
+  (ρ 0.54), a monotone one PASSes (ρ 1.0, fork winner correct, yawd basin at center).
+- **`dist_candidates.py`** — frozen arms: `pixel_l1`; **`sdvae_l2` = the current planning objective**
+  (diffusers `sd-vae-ft-mse`, engine-parity flat-L2; **posterior MODE, deterministic** — found that the
+  engine's `encode_first_stage` default **samples**, so the engine's noise floor ≥ this one; documented);
+  **`dinov2_mse`/`dinov2_cos`** (patch tokens per DINO-WM, vits14/vitb14); `vip_l2` + `vjepa21`
+  (optional deps, graceful skip). sdvae+dinov2 **verified running locally on CPU**. Rung-0/1 learned
+  heads will register here later → every metric ever built is graded on the same rig.
+- **`build_latent_cache.py`** *(pod)* — direct parquet+mp4 read (lerobot-version-proof), chunk-boundary
+  frames → exact preprocess → checkpoint-codec encode (deterministic) → `latents.npy` [N,4,32,32]
+  (~75 MB) + `index.csv` RGB pointers + `meta.json` with every convention pinned. `--hf-vae` fallback.
+- **`wm_imagined_arm.py`** *(pod)* — the 0d validate-first arm: rolls the WM from each radial capture
+  with known straight chunks → combined sweep dir; imagined rows carry **raw WM latents** which
+  `sdvae_l2` scores directly (`feature_is_wm_latent`, no decode→re-encode roundtrip) + decoded frames
+  for image-space candidates; the harness overlays imagined vs clean. At an OOD start pose this arm
+  quantifies the live-frame hallucination as a curve divergence.
+
+**Remaining to close Phase 0 (needs hardware):** (1) robot capture session — re-probe the camera first
+(USB-swap trap), `capture_sweep.py` protocol at a well-covered goal (`nearfan2`-style); (2) pod:
+`build_latent_cache.py --ckpt step-8000`; (3) pod: `wm_imagined_arm.py` on the captured radial arm;
+(4) `dist_harness.py` over all arms × all candidates → **the Gate A table**. See [[roadmap]] 6d,
+[[learned-distance-metric]] "Sequencing".

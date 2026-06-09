@@ -191,23 +191,43 @@ it for LeKiwi**: the `envs/` dir has no LeKiwi/dataset env. Plan (eval-grounded,
   with the Mac as lerobot client on the LAN, stub-planner end-to-end test); **resume on the pod only for live
   CEM inference** (swap stub→real WM, Mac/LAN→RunPod/Tailscale — a config swap, not a rewrite). Full spec in
   [[planning]] "6b — Closed-Loop MPC on LeKiwi".
-- **6d — learned distance objective + subgoal layer — ⭐ PLANNED NEXT (design settled, not yet built).**
-  The concrete design for the ⭐ key-next-step above: a self-supervised **quasimetric (QRL)** distance head
-  on the *latents* (no decode) that learns "≈ chunks-to-drive" from temporal adjacency (neighbours=1) +
-  push-apart + a triangle-inequality (IQE) head → drivable shortest-path distance, **gradient on the
+- **6d — learned distance objective + subgoal layer — ⭐ PLANNED NEXT (design settled 2026-06-09;
+  REVISED same day after a literature stress-test; not yet built).**
+  The concrete design for the ⭐ key-next-step above: a self-supervised **learned temporal-distance** head
+  on the *latents* (no decode) that learns "≈ chunks-to-drive" → drivable distance, **gradient on the
   plateau**. Plugs in as **cost on the *generated* (imagined) latents** `d(ẑ,zg)` (what CEM ranks) +
   **termination on the *current* state** `d(z0,zg)`; validate offline on the `measure_dist_sweep`
-  displacement curves (monotone + non-flat far out) before the robot. Then a **topological graph over real
-  dataset frames** (edges = learned reach, Dijkstra → nearest node = CEM subgoal) for far goals — real-frame
-  nodes **dodge the WM hallucination** imagined subgoals would trigger. Steps build offline now (independent
-  of the retrain); the on-robot far-goal payoff lands once the live-frame gap is also closed.
-  **Build order (decided 2026-06-09):** simple temporal-MLP baseline (rung 0, *with cross-trajectory
-  negatives* — the variable that decides flat-vs-not) → QRL/IQE quasimetric (rung 1) only where the
-  baseline plateaus → topological graph (rung 2). The metric is a **hard prerequisite** for the graph (its
-  edges *are* `d_learned`). The `room.jpg` environment is landmark-rich (low aliasing) → the cheap baseline
-  is worth running first. **Next concrete action = encode-cache + sweep eval (radial/yaw/lateral) + rung-0
-  baseline; the sweep grade is the GO/NO-GO gate before anything downstream.** Full design + objective
-  derivation + pitfalls + refs: **[[learned-distance-metric]].**
+  displacement curves before the robot. Then a **topological graph over real dataset frames** (edges =
+  learned reach, Dijkstra → nearest node = CEM subgoal) for far goals — real-frame nodes **dodge the WM
+  hallucination** imagined subgoals would trigger, and the graph keeps every module in its comfort zone
+  (WM rolls out short hops from real frames; metric trusted only on short well-covered pairs).
+  **Phased plan (revised 2026-06-09, full detail in [[learned-distance-metric]] "Sequencing"):**
+  - **Phase 0 (~1–2 days, Mac): ✅ CODE BUILT (2026-06-09)** — latent cache + **distance-agnostic
+    sweep harness** (+ lateral arm) + **zero-training frozen-embedding arms** (DINOv2-patch — the
+    serious candidate per DINO-WM — V-JEPA 2.1 tokens, VIP, pixel-L1) + WM-imagined arm → **Gate A**
+    (ρ>0.9 to 60 cm, slope>3σ at 40–60 cm, yaw basin preserved). Five tools shipped:
+    `sweep_common.py` (single letterbox/label-grammar/manifest source of truth), `capture_sweep.py`
+    (GPU-free robot capture), `dist_harness.py` (Gate A grader; smoke-tested PASS+FAIL paths),
+    `dist_candidates.py` (frozen arms; sdvae_l2+dinov2 verified on CPU), `build_latent_cache.py` +
+    `wm_imagined_arm.py` (pod-side). **Remaining: real capture session (robot) + pod runs.** The
+    frozen-arm ranking doubles as the codec-selection signal for any semantic-latent retrain.
+  - **Phase 1 (~2–4 days):** rung-0 temporal-MLP (+ ViNG cross-trajectory negatives; symmetric vs
+    asymmetric head ablation; ensemble 3–4; optional patch-DINO distillation) → **Gate B** (GO/NO-GO).
+    **Escalation if rung 0 plateaus = contrastive / MC-quasimetric (CRL/CSF/MQL-style), NOT QRL
+    dual-ascent** — demoted on evidence (OGBench: QRL ~0% on visual tasks; the stitching QRL is bought
+    for is what the graph provides anyway).
+  - **Phase 2 (~1–2 days + robot):** swap winner into `lekiwi_engine` (cost on generated `ẑ`,
+    termination on `z0`, recalibrate `--reach-thresh` to chunk units); on-robot A/B **on well-covered
+    goals only**, progressively farther starts.
+  - **Phase 3 (~3–5 days):** topological graph (~300–600 nodes; temporal edges trusted, metric shortcut
+    edges at pessimistic `d<τ≈3` chunks; edge deletion on failed hops; goal-insertion as OOD detector).
+  - **Parallel track:** **GCBC proposal prior for CEM** (hindsight relabeling; also keeps WM rollouts
+    in-distribution), **MASt3R-SLAM pose oracle** (eval-only; closes the verification gap), and
+    **recollection co-designed for WM + metric + graph** (perimeter coverage, loop closures, both
+    approach directions, slow approaches, exposure/WB lock + udev camera pin first).
+  The metric is a **hard prerequisite** for the graph (its edges *are* `d_learned`). Steps build offline
+  now (independent of the retrain); the on-robot far-goal payoff lands once the live-frame gap is also
+  closed. Full design + objective derivation + pitfalls + refs: **[[learned-distance-metric]].**
 - **6c — long-range:** topological waypoint graph (subsumed by 6d's learned-distance graph).
 
 Params from the evals: **step-8000**, **H = 3–5 chunks** (reliable rollout window; at f=10 → ~10–17 cm
