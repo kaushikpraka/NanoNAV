@@ -151,6 +151,14 @@ Two consistency points specific to using SD-VAE latents:
   clean VAE-encoded dataset latents it could misbehave on imagined ones. So φ's training set should
   **include WM-rolled-out latents** (or at least be validated on them) — the SD-VAE-latent version of the
   live-distribution-gap concern, one level down.
+  - **Decision (2026-06-09): VALIDATE on WM latents first, ADD them to the training set later.**
+    Rungs 0/1 train on clean encoded dataset latents (cheap, simple), but the sweep eval **must include a
+    WM-imagined-`ẑ` arm** — feed φ generated latents (a short WM rollout to a known displacement) and check
+    `d_learned(ẑ, zg)` tracks the clean-latent curve. If clean and imagined latents of the **same pose** map
+    to materially different `d` (the clean↔imagined weld is loose), *then* fold WM-rolled-out latents into
+    φ's training set (a third pair-type alongside adjacent-chunk and cross-episode). Don't pay that cost
+    up front — gate it on the validation arm. This is the same "loose-weld under input shift" axis as the
+    noise/near-pose concern below.
 
 **Why SD-VAE's spatiality is actually an asset here:** because the latent preserves layout, heading/position
 show up as *where* content sits in the grid — readable by a conv φ, and the reason pose is recoverable at
@@ -234,11 +242,28 @@ ones shared by any learned distance but acute here.
 8. **Verification gap** — no global pose ground truth (that's *why* it's self-supervised), so the metric can't
    be certified globally; the `measure_dist_sweep` curves are **local spot-checks** and won't catch a wormhole
    between unsampled regions until it causes a bad plan.
+9. **Loose welds — the benign tail of the same SNR axis as #1.** The *opposite* end of wormholes: the **same**
+   pose in two frames maps **slightly apart** (sub-chunk position jitter, exposure/WB flicker, AV1/sensor
+   noise, or the clean↔imagined-`ẑ` gap). #1 is "different places too close"; this is "same place not close
+   enough." It is **far more forgiving** — the error is **additive and bounded** (a loose weld `d(P,P')≈ε`
+   adds ε of slack to a stitched path `d(A,B) ≤ d(A,P)+ε+d(P',B)`, bounded by φ's Lipschitzness), *not*
+   globally propagated like a false weld. **It's largely handled by construction:** (a) the **local cap is
+   itself the noise-robustness supervision** — adjacent chunks differ by ~one chunk of motion *plus exactly
+   this nuisance*, so `d(zₜ,zₜ₊₁)≤1` literally trains φ to map slightly-perturbed near-same-pose views close;
+   (b) **chunk-count units quantize it away** — a weld at d≈0.2 is sub-step, below reach-thresh / edge-τ / the
+   k-NN localization margin; (c) **capture SNR is fixed upstream** (exposure+WB lock, avoid lossy AV1 — the
+   recollect mitigations). *Where it stops being free is exactly the low-texture carpet centre* — there
+   same-pose-plus-noise is indistinguishable from different-pose-similar-look, i.e. it **collapses back into
+   #1**. They are **one knob** (φ's pose-vs-nuisance SNR), graded by the **lateral `measure_dist_sweep` arm**
+   (d near-zero for small real displacement = weld tight enough, *without* going flat for large = not a
+   wormhole) + ensemble disagreement. See the "VALIDATE on WM latents first" decision under SD-VAE latent
+   handling — the clean↔imagined gap is this same loose-weld concern under input shift.
 
 **Design-against-from-day-one:** wormholes (#1) and reachability≠controllability (#6) — the two with the
 sharpest teeth (the metric amplifies the aliasing our latents are prone to; and we *already observe* the
-under-drive, so an optimal-control metric over-promises). All of the above are **testable offline on the
-sweeps + ensemble disagreement before the robot**.
+under-drive, so an optimal-control metric over-promises). The loose-weld tail (#9) is benign on its own but
+shares #1's knob, so the **lateral sweep + ensemble disagreement grade both ends at once**. All of the above
+are **testable offline on the sweeps + ensemble disagreement before the robot**.
 
 ## Subgoal layer — topological graph (for far goals, AFTER the metric)
 
