@@ -319,8 +319,11 @@ def main():
     ap.add_argument("--goal", default=None, help="goal image (from capture_goal / pre-staged); required for wm")
     ap.add_argument("--reach-thresh", type=float, default=35.0,
                     help="terminate when dist_to_goal < this (latent-L2; calibrate ~35 from 6a)")
-    ap.add_argument("--max-steps", type=int, default=30)
+    ap.add_argument("--max-steps", type=int, default=100)
     ap.add_argument("--speed-scale", type=float, default=1.0, help="global scale on executed velocity (<1 to start)")
+    ap.add_argument("--vx-max", type=float, default=None, metavar="M_S",
+                    help="override velocity-clamp ceiling (default 0.10 m/s = dataset envelope; max dx/chunk = "
+                         "vx_max·0.333). Raise to ~0.12 for ~0.04 m steps — bigger per-step motion/signal, mildly OOD.")
     ap.add_argument("--drive-straight", type=float, default=None, metavar="VX_MS",
                     help="DIAGNOSTIC: ignore CEM and drive a fixed forward vx (m/s), θ=0, each chunk — still "
                          "encodes/logs WM dist_to_goal. Tests if real straight-line motion reduces latent dist.")
@@ -363,6 +366,15 @@ def main():
     ap.add_argument("--rerun-web-port", type=int, default=9090, help="HTTP port for --rerun-web (default 9090)")
     ap.add_argument("--rerun-ws-port", type=int, default=9877, help="WebSocket data port for --rerun-web (default 9877)")
     args = ap.parse_args()
+
+    # Optional override of the velocity-clamp ceiling. Default 0.10 m/s = the measured dataset envelope
+    # (max executed dx/chunk = VX_MAX·CHUNK_DT = 0.033 m). Raising it lets CEM's larger imagined forward
+    # steps (up to ~0.05 m) actually EXECUTE — bigger per-step motion = bigger per-step dist signal, and
+    # removes the imagine-vs-execute mismatch. >~0.12 is mildly out-of-distribution (the WM saw ≤0.033/chunk).
+    if args.vx_max is not None:
+        print(f"[clamp] VX_MAX {lk.VX_MAX} -> {args.vx_max} m/s  (max dx/chunk {lk.VX_MAX*lk.CHUNK_DT:.3f} "
+              f"-> {args.vx_max*lk.CHUNK_DT:.3f} m)")
+        lk.VX_MAX = float(args.vx_max)
 
     if args.planner == "wm" and not args.goal:
         sys.exit("--planner wm needs --goal <image>.")

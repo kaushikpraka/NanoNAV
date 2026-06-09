@@ -672,3 +672,21 @@ closing — `_preprocess` parity check or fine-tune on live frames.)
 **New tooling this session (uncommitted unless noted):** `--var-scale` (committed), `--vx-max` (uncommitted,
 needs a clean robot run), `--max-steps` default 30→**100**, interactive-driver **start-frame switcher**
 (prev/next/random/jump over the 4405 val slices; committed, submodule 8f78848).
+
+**⭐ Operator's synthesis (end of session) — the planner/objective is the highest-value next work; the WM is a
+good-enough foundation.** On the H=5 run the operator watched the planner **correctly prioritize rotation and
+turn the bot to face the chair** (overshot, ended a bit close) — a *qualitative* success — yet `dist` sat ~48
+the whole time. So **the latent-L2 objective under-credited a real success**: CEM *chose* the right behavior
+but the metric barely rewarded the alignment, so nothing locked it in → overshoot/drift. This is the same
+failure as the flat plateau: **raw `‖z0−zg‖` doesn't track real reachability/pose-progress.** Conclusion:
+"improve the planner" ≈ "improve the *distance objective*"; the search itself is fine (offline CEM hits the WM
+ceiling). The WM has **generally mapped the room** (poses distinguishable near goals per the sweeps) — a solid
+base to build a better objective on rather than retraining dynamics. Caveat acknowledged: **decoded frames are
+still blurry** = the **VAE/WM reconstruction is lossy / latents are smooth** — but a learned distance operates
+**on the latents (never decodes)**, so blur doesn't block it, and the smoothness is *part of why* raw L2 is
+flat. **Concrete build (the ⭐ key next step):** a self-supervised **temporal-distance / quasimetric** head on
+the existing latents — sample frame pairs from the dataset, label by temporal gap (k frames apart → dist ≈ k),
+train a small head to predict reachability-distance; swap `dist_to_goal = ‖z0−zg‖` for `d_learned(z0,zg)` in
+both the readout and CEM's objective. Trains on data we already have (no new collection); also unlocks
+**model-imagined subgoals** ("plan fully in the WM, no manual waypoints"). See [[open-questions]] "Scoring
+function alternatives". Operator is moving to off-pod planning from here.

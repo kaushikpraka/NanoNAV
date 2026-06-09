@@ -132,6 +132,23 @@ mis-calibrated RMS gate is moot. See [[planning]] "6a — RESULTS", [[experiment
 - Learned navigational distance predictor
 - Pose-based scoring via DA3 localization in reconstruction
 
+**⭐ NOW THE #1 PRIORITY (empirically motivated, 2026-06-09).** On-robot closed-loop 6b confirmed the
+**objective is the bottleneck, not the WM or the CEM search.** Raw SD-VAE latent-L2 (`‖z0−zg‖`, equal weight
+on every latent cell) is well-conditioned **near** the goal (sweeps: basin floor ~16, SNR ~17–97) but **flat
+far out** — most cells encode generic floor/wall, so distant poses look ~equidistant → no gradient on the
+"plateau." It also **under-credits real progress**: the planner rotated the bot to face the chair yet `dist`
+stayed ~48 (it didn't reward the alignment, so the bot overshot). `--horizon 5`, `--var-scale 2`,
+`--vx-max 0.12` all fail to help because they don't change *what's being optimized*. Offline CEM already hits
+the WM's accuracy ceiling (Stage 6a), and the WM has generally mapped the room — so the fix is the **distance
+metric**, not more dynamics training or search.
+**Build:** a self-supervised **temporal-distance / quasimetric** head on the *latents* (no decode, so the
+known decode-blur is irrelevant): sample frame pairs from the existing dataset, label by temporal gap
+(k frames apart → dist ≈ k; or contrastive/quasimetric), train a small head to predict reachability-distance.
+Then swap `dist_to_goal = ‖z0−zg‖` → `d_learned(z0,zg)` in the readout **and** CEM's objective. Gives gradient
+on the plateau + credits pose-progress, and unlocks **model-imagined subgoals** (imagine reachable futures →
+score by learned distance → hop → repeat = "plan fully in the WM, no manual waypoints"). Trainable on data we
+already have. See [[experiment-log]] 2026-06-09, [[roadmap]] 6b.3.
+
 ## Future Extensions
 
 ### Pattern B (goal-conditioned video generation + IDM)

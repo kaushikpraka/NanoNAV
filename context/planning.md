@@ -96,6 +96,11 @@ buy back pivot control at very low steps). On a cheaper GPU these replans are ~2
 offline; for 6b closed-loop the H100 is the better box).
 - **Scoring:** latent-L2 (`objective.py`), valid **<~30 cm**; beyond that the landscape flattens → use the
   **waypoint scaffold** (Solution 1 below) for longer routes.
+  **⭐ 2026-06-09 update (on-robot 6b):** the flattening is now the confirmed #1 blocker — raw latent-L2 has no
+  gradient on the plateau *and* under-credits real pose-progress (planner rotated to face the goal, dist barely
+  moved). **Highest-leverage next step = replace latent-L2 with a self-supervised learned/temporal-distance
+  metric** (trains on existing latents; gradient on the plateau + enables model-imagined subgoals instead of a
+  manual waypoint graph). See [[open-questions]] "Scoring function alternatives", [[experiment-log]] 2026-06-09.
 
 ### 6a — Offline Planning Eval (implementation spec, 2026-06-04)
 
