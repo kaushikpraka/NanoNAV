@@ -170,7 +170,9 @@ it for LeKiwi**: the `envs/` dir has no LeKiwi/dataset env. Plan (eval-grounded,
   fail to help — because the **objective has no gradient on the plateau** (raw flattened `‖z0−zg‖` weights all
   latent cells equally; most encode generic floor/wall → far poses look ~equidistant). Fix = a self-supervised
   **temporal-distance / quasimetric** (frames k apart → dist ≈ k, trainable on existing data) to put gradient
-  on the plateau → also enables **model-imagined subgoals** (no manual waypoints). Also surfaced: exec is
+  on the plateau → also enables **model-imagined subgoals** (no manual waypoints). **Design settled →
+  [[learned-distance-metric]]** (QRL/IQE objective, current-vs-generated wiring, sweep eval, subgoal graph,
+  optional VLM-teacher); tracked as **6d** below. Also surfaced: exec is
   **execute-one-replan** (only chunk #1 runs/plan; horizon only changes planning, robot still moves ~3 cm/step);
   a **USB camera-enumeration swap** on Pi-host restarts (durable fix = udev rule pinning `top` by serial; always
   re-probe after a restart); rollout "+1 looks poor" = `scheduling_mode:sequential` (+1 tied directly to z0) →
@@ -189,7 +191,18 @@ it for LeKiwi**: the `envs/` dir has no LeKiwi/dataset env. Plan (eval-grounded,
   with the Mac as lerobot client on the LAN, stub-planner end-to-end test); **resume on the pod only for live
   CEM inference** (swap stub→real WM, Mac/LAN→RunPod/Tailscale — a config swap, not a rewrite). Full spec in
   [[planning]] "6b — Closed-Loop MPC on LeKiwi".
-- **6c — long-range:** topological waypoint graph.
+- **6d — learned distance objective + subgoal layer — ⭐ PLANNED NEXT (design settled, not yet built).**
+  The concrete design for the ⭐ key-next-step above: a self-supervised **quasimetric (QRL)** distance head
+  on the *latents* (no decode) that learns "≈ chunks-to-drive" from temporal adjacency (neighbours=1) +
+  push-apart + a triangle-inequality (IQE) head → drivable shortest-path distance, **gradient on the
+  plateau**. Plugs in as **cost on the *generated* (imagined) latents** `d(ẑ,zg)` (what CEM ranks) +
+  **termination on the *current* state** `d(z0,zg)`; validate offline on the `measure_dist_sweep`
+  displacement curves (monotone + non-flat far out) before the robot. Then a **topological graph over real
+  dataset frames** (edges = learned reach, Dijkstra → nearest node = CEM subgoal) for far goals — real-frame
+  nodes **dodge the WM hallucination** imagined subgoals would trigger. Steps build offline now (independent
+  of the retrain); the on-robot far-goal payoff lands once the live-frame gap is also closed. **Full design +
+  objective derivation + refs: [[learned-distance-metric]].**
+- **6c — long-range:** topological waypoint graph (subsumed by 6d's learned-distance graph).
 
 Params from the evals: **step-8000**, **H = 3–5 chunks** (reliable rollout window; at f=10 → ~10–17 cm
 reach), latent-L2 scoring valid **<~30 cm**, CEM ~64×5×top-10, DDIM 20. Develop the code on a cheap box
@@ -197,8 +210,9 @@ reach), latent-L2 scoring valid **<~30 cm**, CEM ~64×5×top-10, DDIM 20. Develo
 
 ## ⬜ Stage 7 — Long-Range Navigation
 
-Topological waypoint graph (+ DepthAnything3 metric edges) is the recommended start; HWM / learned
-distance as alternatives. Where most [[open-questions]] cluster. See [[planning]].
+Topological waypoint graph (+ DepthAnything3 metric edges); now the recommended path is the
+**learned-distance graph over real dataset frames** designed in [[learned-distance-metric]] (Stage 6d) —
+DA3 metric edges / HWM are alternatives. Where most [[open-questions]] cluster. See [[planning]].
 
 ## ⬜ Stage 8 — Extensions (future)
 

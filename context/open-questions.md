@@ -169,6 +169,16 @@ on the plateau + credits pose-progress, and unlocks **model-imagined subgoals** 
 score by learned distance → hop → repeat = "plan fully in the WM, no manual waypoints"). Trainable on data we
 already have. See [[experiment-log]] 2026-06-09, [[roadmap]] 6b.3.
 
+**Design settled (2026-06-09) → [[learned-distance-metric]].** Chosen approach = **quasimetric RL (QRL)**:
+learns "≈ chunks-to-drive" (drivable shortest-path distance, not appearance) from temporal adjacency
+(neighbours=1) + push-apart + an IQE triangle-inequality head — gradient on the plateau by construction,
+and asymmetric (directionality). Wiring: **cost on the *generated* (imagined) latents** `d(ẑ,zg)` (CEM
+ranks actions by imagined outcome — the only action-dependent quantity), **termination/readout on the
+*current* state** `d(z0,zg)`; lean on the metric so the WM rollout can stay short. Validate offline on the
+`measure_dist_sweep` ground-truth-displacement curves first. Subgoals = a **topological graph over real
+dataset frames** (real-frame nodes dodge the WM hallucination that imagined subgoals would trigger);
+WM-imagined subgoals + an optional offline VLM-teacher are deferred. Tracked as [[roadmap]] **6d**.
+
 ## Future Extensions
 
 ### Pattern B (goal-conditioned video generation + IDM)
