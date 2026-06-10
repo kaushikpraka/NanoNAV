@@ -228,6 +228,14 @@ it for LeKiwi**: the `envs/` dir has no LeKiwi/dataset env. Plan (eval-grounded,
   The metric is a **hard prerequisite** for the graph (its edges *are* `d_learned`). Steps build offline
   now (independent of the retrain); the on-robot far-goal payoff lands once the live-frame gap is also
   closed. Full design + objective derivation + pitfalls + refs: **[[learned-distance-metric]].**
+- **6e — semantic WM retrain (Option C) — 🚧 IN PROGRESS (2026-06-10).** Retrain the WM over frozen
+  DINOv2 patch tokens (flow-matching/x0; NOT diffusion-forcing) so the rollout space is the
+  Gate-A-validated distance space; CEM cost = token cosine (zero training). C0 probe matrix (4 short
+  runs, action-atrophy kill-switch) → C0.5 viz decoder → C0-ext winner to 12k + Gate C ladder → C1
+  planner swap (on-robot A/B needs operator) → C2 recollection (150–250 eps) + full retrain → C3
+  token-space subgoal graph. Supersedes 6d's Option-B distillation variant; the temporal metric +
+  graph design in [[learned-distance-metric]] retarget to token space. Full plan:
+  **[[semantic-wm-retrain]]**.
 - **6c — long-range:** topological waypoint graph (subsumed by 6d's learned-distance graph).
 
 Params from the evals: **step-8000**, **H = 3–5 chunks** (reliable rollout window; at f=10 → ~10–17 cm

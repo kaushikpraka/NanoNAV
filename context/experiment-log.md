@@ -977,3 +977,29 @@ step-12000 to HF.
 **Next:** Phase 1 (rung-0 learned distance) with patch-DINO distillation as the lead variant; bar to
 beat = ρ>0.94 / far-slope>12σ. Optionally append forks + a second-goal sweep first. See
 [[learned-distance-metric]] "Sequencing" Gates A/B.
+
+## 2026-06-10 (decision + launch) — OPTION C: retrain the WM over frozen DINOv2 tokens; C0 probe matrix launched
+
+Design session (operator + Gate A data) settled the route for using the DINO signal: **NOT distilling
+DINO distances into a φ that reads SD-VAE latents (Option B — stacks two approximations: φ ≈
+DINO∘decode, on 23σ-off rollouts), but retraining the WM to predict frozen DINOv2 patch tokens**
+(flow-matching/x0, NOT diffusion-forcing) so the rollout space IS the validated distance space and the
+CEM cost (token cosine = the DINO-WM/RAE-NWM cost) needs zero training. Data-demand analysis: not
+significantly more (frozen encoder ⇒ dynamics-only learning; same 256-token sequence at B/1; semantic
+latents MORE action-recoverable under regression; all small-data precedents semantic-side) — and the
+OOD failure mode flips from vivid wrong-room hallucination to benign averaging (attacks blocker #1).
+Full plan + rationale: [[semantic-wm-retrain]] (roadmap 6e). Decoder for viz now in scope (C0.5,
+eval-only). Subgoal graph (C3) stays in scope, simplified: first edges from calibrated frozen token
+distance, learned head only if drivability gaps appear.
+
+**Prep (same day):** encoder parity confirmed — `facebook/dinov2-small` == Gate-A's `dinov2_vits14`
+(224px, 16×16×384 tokens). **`latent_codec.latent_scale` added to nanowm (69fe01b)** — measured DINO
+token std 2.4 on lekiwi → scale to ~unit for FM targets (SD-VAE scaling_factor analog; verified
+std 0.999 post-scale). Decoder-less validation already supported (latent-only metrics path). 12-step
+smoke run of the C0a config PASSED (flow loss 1.8→1.74, no decoder crash).
+
+**C0 probe matrix launched** (`scripts/run_c0_probes.sh`, sequential, ~3k steps ≈ 3 h each):
+C0a flow+adaln_fuse (the RAE-NWM-shaped bet) · C0b flow+cross_attention · C0c x0+adaln_fuse ·
+C0d flow+additive (control — expected to reproduce Finding #4). Per-run kill-switch =
+`action_diagnostic` (PASS: action-emb RMS > 0.05 AND GT-action latent-L2 < zero/random baselines);
+verdicts accumulate in `results/c0_probe_summary.md`.
