@@ -1058,3 +1058,12 @@ Running: C0-ext (x0+adaln_fuse → 12k, `results/C0ext.log`, loss ~0.21 at this 
 viz decoder. Next (blocked on those): Gate C ladder — action_diagnostic @12k, offline CEM action
 recovery, weld re-test (beat SD-VAE's +23σ / d must FALL within rollouts), nearhamper roll.
 On-robot A/B remains the operator handoff point.
+
+## 2026-06-10 (C0.5 + C1 viz) — token→RGB decoder trained (val 0.045); full imagined-strip path verified
+
+C0.5 decoder done (15k steps, `results/token_decoder/decoder.pt`): GT-vs-decode val grids nearly
+indistinguishable (`val_015000.png`) — landmarks, robot arm, viewpoint all faithful. Engine smoke with
+`token_decoder=` on the C0c probe ckpt produced the live|+1+2+3|goal strip
+(`results/c1_smoke_strip.png`): imagined frames are SOFT-BUT-CORRECT renderings of the same scene —
+the benign-averaging OOD behavior Option C was chosen for, visible already at 3k steps. C1 offline
+scope complete; remaining C1 = on-robot A/B (operator). Everything now blocks on C0-ext → Gate C.
