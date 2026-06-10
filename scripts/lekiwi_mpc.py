@@ -270,6 +270,24 @@ def _action_arrow(rr, vx, theta_deg, img_hw=256):
                        colors=[[255, 230, 0]], radii=[2.0])
 
 
+def rr_log_observed(ctx, step, frame):
+    """Log the live camera frame AT OBSERVE TIME (before the ~7 s plan), so the viewer reflects
+    what the planner is actually planning from — not a frame that is plan_ms stale by the time
+    the full telemetry lands (the perceived several-frames lag, 2026-06-10)."""
+    if ctx is None:
+        return
+    rr, streams = ctx
+    from sweep_common import letterbox_rgb
+    model_view = letterbox_rgb(frame)            # the blueprint's "camera (now)" panel = model/live
+    for rec in streams:
+        try:
+            _rr_set_time(rr, step, rec)
+            rr.log("live", rr.Image(frame), recording=rec)
+            rr.log("model/live", rr.Image(model_view), recording=rec)
+        except Exception as e:
+            print(f"[rerun] observe-time log failed ({e})")
+
+
 def rr_log(ctx, step, frame, goal, res: PlanResult, executed):
     if ctx is None:
         return
@@ -412,7 +430,19 @@ def main():
         print("\n[ctrl-c] sent zero + disconnected."); sys.exit(130)
     signal.signal(signal.SIGINT, _stop)
 
-    robot.connect()
+    # ZMQ cold-start flake: the first connect after host/tunnel (re)start times out, the retry
+    # lands (observed repeatedly 2026-06-10). Recreate the client per attempt — a timed-out
+    # client object doesn't recover.
+    for attempt in range(1, 4):
+        try:
+            robot.connect()
+            break
+        except Exception as e:
+            if attempt == 3:
+                raise
+            print(f"[mpc] connect attempt {attempt} failed ({type(e).__name__}); retrying in 3 s ...")
+            time.sleep(3.0)
+            robot = LeKiwiClient(lk.make_client_config(args.ip, args.id, cameras=("top",)))
     act_keys = lk.feature_keys(robot, "action")
     base_keys = lk.classify_base_vel_keys(act_keys)
     if not base_keys["x"] or not base_keys["theta"]:
@@ -432,8 +462,9 @@ def main():
         lk.stop(robot, act_keys, base_keys)
         time.sleep(args.settle)
 
-        # 2. OBSERVE
+        # 2. OBSERVE — and surface it in the viewer immediately (planning takes ~7 s)
         frame = get_top_frame(robot)
+        rr_log_observed(tel, step, frame)
 
         # 3. PLAN
         t0 = time.monotonic()
