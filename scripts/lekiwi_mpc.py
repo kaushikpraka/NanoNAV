@@ -115,6 +115,8 @@ def make_planner(args):
         num_samples=args.num_samples, opt_steps=args.opt_steps, topk=args.topk,
         horizon=args.horizon, n_elite_viz=args.elite_viz,
         action_mean=a_mean, action_std=a_std, var_scale=args.var_scale,
+        cost_metric=args.cost_metric, cost_mode=args.cost_mode,
+        token_decoder=args.token_decoder,
     )
 
 
@@ -345,6 +347,15 @@ def main():
     ap.add_argument("--opt-steps", type=int, default=3)
     ap.add_argument("--topk", type=int, default=10)
     ap.add_argument("--horizon", type=int, default=3)
+    ap.add_argument("--cost-metric", choices=["auto", "mse", "cosine"], default="auto",
+                    help="CEM cost + termination metric. auto = mse for sd_vae ckpts, token-cosine "
+                         "for semantic (DINO) ckpts. NOTE: cosine dist is ~0-2 — recalibrate "
+                         "--reach-thresh (Gate-A dinov2_cos basin floor ~0.13, plateau ~0.28-0.42).")
+    ap.add_argument("--cost-mode", choices=["last", "first", "all"], default="last",
+                    help="which imagined frame(s) the cost scores: last=+H endpoint (6b behavior), "
+                         "first=+1 chunk (least WM-degraded, the chunk actually executed), all=exp-weighted")
+    ap.add_argument("--token-decoder", default=None,
+                    help="train_token_decoder.py checkpoint for imagined-rollout viz with semantic ckpts")
     ap.add_argument("--var-scale", type=float, default=1.0,
                     help="CEM initial sampling std × dataset action-std (1.0=in-distribution; >1 widens "
                          "exploration incl. stronger rotations, at the cost of more out-of-distribution actions)")
