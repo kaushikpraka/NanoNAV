@@ -204,17 +204,37 @@ def run(sweeps, candidates, out_dir, plots=True):
             metrics = {"noise": {"n": len(noise), "sigma": sigma,
                                  "mean": float(np.mean(noise)) if noise else None}}
 
-            # ---- axes ----
-            metrics["radial"] = grade_axis([(c.params["r_cm"], dists[c.idx]) for c in sweep.by_arm("radial")], sigma)
-            metrics["lateral"] = grade_axis([(abs(c.params["lat_cm"]), dists[c.idx]) for c in sweep.by_arm("lateral")], sigma)
-            metrics["yaw"] = grade_yaw([(c.params["yaw_deg"], dists[c.idx]) for c in sweep.by_arm("yaw")], sigma)
+            # ---- axes (Gate A grades CLEAN captures only — imagined rows are the separate
+            #      weld-validation arm below, never mixed into the gate) ----
+            metrics["radial"] = grade_axis([(c.params["r_cm"], dists[c.idx]) for c in sweep.by_arm("radial", imagined=False)], sigma)
+            metrics["lateral"] = grade_axis([(abs(c.params["lat_cm"]), dists[c.idx]) for c in sweep.by_arm("lateral", imagined=False)], sigma)
+            metrics["yaw"] = grade_yaw([(c.params["yaw_deg"], dists[c.idx]) for c in sweep.by_arm("yaw", imagined=False)], sigma)
             # yaw-at-distance: grade like a yaw basin, per radius
             yd = defaultdict(list)
-            for c in sweep.by_arm("yaw_at_dist"):
+            for c in sweep.by_arm("yaw_at_dist", imagined=False):
                 yd[c.params["r_cm"]].append((c.params["yaw_deg"], dists[c.idx]))
             for r_cm, pairs in sorted(yd.items()):
                 metrics[f"yaw_at_{r_cm:g}cm"] = grade_yaw(pairs, sigma)
-            metrics["grid"] = grade_axis([(c.params["r_cm"], dists[c.idx]) for c in sweep.by_arm("grid")], sigma)
+            metrics["grid"] = grade_axis([(c.params["r_cm"], dists[c.idx]) for c in sweep.by_arm("grid", imagined=False)], sigma)
+
+            # ---- WM-imagined arm (informational, not gated): same-axis grade + the
+            #      clean<->imagined weld = mean offset of imagined d above/below the clean
+            #      radial curve at the same nominal displacement (loose-weld check, the
+            #      learned-distance-metric.md VALIDATE-FIRST decision) ----
+            img_rad = sweep.by_arm("radial", imagined=True)
+            if img_rad:
+                metrics["radial_imagined"] = grade_axis(
+                    [(c.params["r_cm"], dists[c.idx]) for c in img_rad], sigma)
+                clean_pts = sorted((c.params["r_cm"], dists[c.idx])
+                                   for c in sweep.by_arm("radial", imagined=False))
+                if len(clean_pts) >= 2:
+                    cx = np.array([p[0] for p in clean_pts], dtype=float)
+                    cy = np.array([p[1] for p in clean_pts], dtype=float)
+                    offs = [dists[c.idx] - float(np.interp(c.params["r_cm"], cx, cy))
+                            for c in img_rad]
+                    metrics["radial_imagined"]["weld_offset_mean"] = float(np.mean(offs))
+                    if sigma:
+                        metrics["radial_imagined"]["weld_offset_over_sigma"] = float(np.mean(offs) / sigma)
             forks = grade_forks(sweep.by_arm("fork"), dists, sigma)
 
             verdict, reasons = gate_a(metrics)

@@ -114,14 +114,14 @@ def main():
         obs_0 = {"visual": lp._preprocess(frame)}
         with torch.no_grad():
             z, _ = lp.wm.rollout(obs_0, mu, num_sampling_steps=args.ddim)
-        vis = z["visual"]                                        # [1, 1+H, C_lat, h, w]
+        vis = z["visual"]                                        # [1, 1+H, C_lat*h*w] (engine flattens)
         for k in range(1, vis.shape[1]):
             nominal = r0 - k * args.dx * 100.0
             if nominal < -1.0:
                 break
             label = f"r{max(nominal, 0.0):g}"
             stem = f"img_{idx:03d}_from_r{r0:g}_plus{k}"
-            lat = vis[0, k].cpu().numpy()
+            lat = vis[0, k].cpu().numpy().reshape(lp.C_lat, lp.h_lat, lp.w_lat)
             lat_rel = os.path.join("latents", f"{stem}.npy")
             np.save(os.path.join(args.out, lat_rel), lat)
             dec_rel = os.path.join("frames", f"{stem}.png")
