@@ -209,7 +209,10 @@ nanowm's Finding #4 ("DINO/V-JEPA fail at action conditioning") is evidence abou
 semantic latents, not semantic latents per se**: every published success with frozen semantic features
 uses a **deterministic teacher-forced regression predictor** (DINO-WM arXiv:2411.04983: MSE, actions per
 patch token; V-JEPA 2-AC arXiv:2506.09985: L1 + rollout loss; DINO-world arXiv:2507.19468) or
-x0-prediction (V-JEPA 2.1 nav WM, arXiv:2603.14482). Mechanism: semantic features are temporally smooth
+x0-prediction (V-JEPA 2.1 nav WM, arXiv:2603.14482), or — new evidence, **RAE-NWM arXiv:2603.09241 —
+flow-matching velocity prediction** (CDiT over frozen DINOv2 patch tokens, AdaLN-gated actions, beats
+VAE-latent NWM: Habitat SR 78.95% vs 43.33%). So "generative ⊗ semantic" works; the unproven combination
+narrows to *diffusion-forcing* specifically. Mechanism: semantic features are temporally smooth
 → the denoiser scores well by copying context → action branch starves; SD-VAE's per-step texture
 variance is what kept ours alive. Why it matters here: semantic latents preserve action geometry
 *better* under regression (arXiv:2605.06388), and regression predictors **degrade to benign averaging
@@ -218,7 +221,10 @@ hallucination blocker above. Decision point = the coverage retrain; Gate A's fro
 ([[learned-distance-metric]]) doubles as the codec choice. A codec swap alone (`latent_codec=webdino|
 vjepa2_1` under diffusion-forcing) would just reproduce Finding #4. The metric/graph stack transfers
 (φ retargets; harness/graph are latent-agnostic). Costs: predictor-objective change in nanowm + a small
-viz decoder (SD-VAE's free decodability is lost).
+viz decoder (SD-VAE's free decodability is lost; RAE-NWM's frozen pretrained RAE decoder is a drop-in
+answer). **Closest published blueprint = RAE-NWM** (recipe, hyperparameters, token-space CEM cost,
+single-env 1K-trajectory scale data point): see [[learned-distance-metric]] "If the retrain switches
+latent space".
 
 ### Pattern B (goal-conditioned video generation + IDM)
 Same data, same encoder. Replace action conditioning with goal-image conditioning. Train separate IDM on action-labeled data. Compare Pattern A vs Pattern B on same scene. Analytic optical-flow IDM baseline (AVDC-style, zero labels).

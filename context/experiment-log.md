@@ -887,3 +887,27 @@ anywhere — all candidates are formulas or frozen pretrained nets; the work is 
 `build_latent_cache.py --ckpt step-8000`; (3) pod: `wm_imagined_arm.py` on the captured radial arm;
 (4) `dist_harness.py` over all arms × all candidates → **the Gate A table**. See [[roadmap]] 6d,
 [[learned-distance-metric]] "Sequencing".
+
+## 2026-06-09 (paper review) — RAE-NWM (arXiv:2603.09241): semantic-retrain branch de-risked; Finding-#4 claim narrowed; dinov2 arm prior raised
+
+Deep-read RAE-NWM (*Navigation World Model in Dense Visual Representation Space*, code
+`github.com/20robo/raenwm`) — it is the "switch the WM latent space to DINOv2" experiment executed
+end-to-end: **flow-matching CDiT over frozen DINOv2 patch tokens** (CLS dropped, 256×768d), CEM planning
+with a **token-space DINO cost (no decode)**, decisively beating VAE-latent NWM (Habitat SR 78.95% vs
+43.33%, ATE 2.91 vs 4.12, LPIPS@16s 0.349 vs 0.470). Takeaways folded into [[learned-distance-metric]]
+"If the retrain switches latent space" + refs, and [[open-questions]] "Semantic-latent WM retrain":
+
+- **Finding-#4 claim NARROWED:** their generative (flow-matching velocity) predictor over semantic
+  latents works — action branch did not starve (AdaLN-gated conditioning). So "generative ⊗ semantic"
+  is published-working; the unproven combination is *diffusion-forcing* specifically.
+- **`dinov2_cos` Phase-0 arm prior raised:** two nav planners (DINO-WM + RAE-NWM) now succeed with the
+  token-space patch-DINO cost. But the paper never measures far-field flatness (8 m episodes, 1 m
+  success radius, 8-step rollouts) → **Gate A stands; the sweep still measures what the literature
+  hasn't.** No metric / subgoal / graph machinery in the paper → build order untouched.
+- **Steal-list for the semantic retrain:** frozen RAE decoder for viz (answers the lost-decodability
+  cost), AdamW lr 2e-4→2e-6 / wd 0 / eff-batch 96 / 50 epochs / 2×A800 ~2 days, CEM 120×8-step.
+  Scale: single-env 1K-trajectory regime demonstrated (~20× our 50 eps → recollection matters
+  regardless of codec). Their DINOv2 failure mode (high-freq stochastic texture, grass) is benign for
+  our featureless-carpet room.
+
+Next: unchanged — close Phase 0 (capture session + pod cache/imagined runs → Gate A table).

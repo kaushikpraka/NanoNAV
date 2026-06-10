@@ -475,10 +475,16 @@ nanowm's Finding #4 ("DINO/V-JEPA fail at action conditioning", action-RMS → 0
 evidence about **diffusion-forcing ⊗ semantic latents, not about semantic latents per se**. Every
 published success with frozen semantic features uses a **deterministic teacher-forced regression
 predictor** — DINO-WM (MSE, actions concatenated per patch token), V-JEPA 2-AC (L1 + 2-step rollout
-loss), DINO-world (arXiv:2507.19468, smooth-L1) — and nobody has made plain diffusion-forcing into
-semantic latents work. Mechanism: semantic features are temporally smooth → the denoiser scores well by
-copying context → the action branch starves; SD-VAE's high per-step variance (texture flicker) is what
-kept our action branch alive. Implications for the retrain decision point:
+loss), DINO-world (arXiv:2507.19468, smooth-L1) — and nobody has made plain diffusion-*forcing* into
+semantic latents work. **Nuance (2026-06-09, RAE-NWM arXiv:2603.09241): "generative ⊗ semantic" is NOT
+ruled out** — RAE-NWM runs a **flow-matching (velocity-prediction) CDiT over frozen DINOv2 patch tokens**
+with AdaLN-gated action conditioning and beats VAE-latent NWM decisively (Habitat SR 78.95% vs 43.33%,
+ATE 2.91 vs 4.12, LPIPS@16s 0.349 vs 0.470); its action branch did not starve. So the unproven claim
+narrows to *diffusion-forcing* specifically; flow-matching next-token and x0/regression are both
+published-working over semantic latents. Mechanism (still the operative concern for diffusion-forcing):
+semantic features are temporally smooth → the denoiser scores well by copying context → the action
+branch starves; SD-VAE's high per-step variance (texture flicker) is what kept our action branch alive.
+Implications for the retrain decision point:
 - **Semantic-latent WM = codec swap + objective swap together** (regression/x0-prediction predictor,
   actions per token); re-running `latent_codec=webdino|vjepa2_1` under diffusion-forcing would just
   reproduce Finding #4. V-JEPA 2.1's nav WM (arXiv:2603.14482) shows the diffusion-compatible variant:
@@ -494,8 +500,20 @@ kept our action branch alive. Implications for the retrain decision point:
   top-down nav, ~80%).
 - **This stack transfers:** φ retargets to the new latent space, the pair sampler / sweep harness /
   graph machinery are latent-agnostic. Gate A's frozen-arm ranking doubles as the codec-selection
-  signal. Plan a small separate decoder for viz (DINO-WM trained one) — SD-VAE's free decodability is
-  lost.
+  signal. Plan a small separate decoder for viz (DINO-WM trained one; RAE-NWM uses a **frozen
+  pretrained RAE decoder** — a drop-in answer to this) — SD-VAE's free decodability is lost.
+- **Closest published blueprint if the retrain goes semantic = RAE-NWM** (arXiv:2603.09241, code
+  `github.com/20robo/raenwm`): frozen DINOv2, **drop CLS, keep all 256 patch tokens × 768d**;
+  flow-matching velocity target; CEM cost = **DINO patch-token distance computed in token space on the
+  predicted rollout vs goal, no decode** (= our `dinov2_cos` Phase-0 arm — now two nav planners,
+  DINO-WM + RAE-NWM, succeed with that cost). Starting hyperparameters: AdamW, lr 2e-4→2e-6 linear,
+  wd 0, eff-batch 96, 50 epochs, 2×A800 ~2 days (1×H100 plausible at our scale); CEM 120 candidates ×
+  8-step rollouts. Scale data point: their Habitat model trained **single-environment on 1,000
+  trajectories** — single-env works but is ~20× our 50 episodes, so the recollection session matters
+  regardless of codec. Caveats: it never measures far-field cost flatness (8 m episodes, **1 m success
+  radius**, 8-step rollouts — the plateau regime is unmeasured → Gate A stands), has no metric/graph
+  machinery (build order untouched), and its stated DINOv2 failure mode (ignores high-frequency
+  stochastic texture, e.g. grass) is benign here — our problem texture is featureless carpet.
 
 ## Sequencing — phased plan (revised 2026-06-09)
 
@@ -582,7 +600,10 @@ gap is also closed.
   arXiv:2507.01667 (global embeddings ≈ no relative pose); ViT-VS arXiv:2503.04545 (rotation-invariance
   failure); AnyLoc arXiv:2308.00688 (VPR ≠ metric monotonicity); **VIP** arXiv:2210.00030 + negative
   OOD evidence (LIV arXiv:2306.00958, GVL arXiv:2411.04549, BiMI arXiv:2409.15922).
-- Semantic-latent WM / Finding-#4 reinterpretation: **Reconstruction or Semantics?** arXiv:2605.06388
+- Semantic-latent WM / Finding-#4 reinterpretation: **RAE-NWM** arXiv:2603.09241 (flow-matching CDiT
+  over frozen DINOv2 patch tokens, token-space DINO cost for CEM, beats VAE-latent NWM — the closest
+  published blueprint for the semantic retrain; code `github.com/20robo/raenwm`);
+  **Reconstruction or Semantics?** arXiv:2605.06388
   (semantic > VAE latents on action-relevant metrics under regression); DINO-world arXiv:2507.19468;
   **PLDM** arXiv:2502.14819 (JEPA latent dynamics + MPC nav at thousands-of-transitions scale);
   NWM arXiv:2412.03572 (LPIPS CEM cost; OOD mode collapse at 1B); GameNGen arXiv:2408.14837
