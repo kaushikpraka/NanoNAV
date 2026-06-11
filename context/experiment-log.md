@@ -1109,3 +1109,50 @@ export WEBDINO_MODEL_PATH=facebook/dinov2-small   # REQUIRED — config default 
 (token-cosine scale: noise floor ~0.01, 10 cm ≈ 0.14, plateau ~0.28–0.42 → start `--reach-thresh`
 0.06–0.10. A/B vs the SD-VAE step-12000 stack on the same goals; then `--cost-mode first` as the
 second arm. Camera re-probe first if the Pi host restarted.)
+
+## 2026-06-11 (ON-ROBOT) — semantic stack first closed-loop session: 3/3 physical arrivals, incl. ×2 on the goal the SD-VAE stack failed; floor ≈ 0.2 with cross-session goal images
+
+First on-robot runs of the Gate-C stack (C0ext 12k x0+adaln_fuse, token-cosine cost, cost-mode
+**last** this session, reach-thresh 0.08, full speed, ~7.2 s/replan). `.rrd`s:
+`results/mpc_semantic_{nearfan2,nearchair1,nearchair1_pos2}.rrd`.
+
+| run | goal | trace | physical outcome (operator) |
+|---|---|---|---|
+| 1 | nearfan2 | hovered 0.23–0.28 by step ~34–45 | "approximately the right position" |
+| 2 | nearchair1 | **0.32 → 0.21 monotone ~20 steps**, vx pegged 0.10 mid-run | **reached the chair** (slightly left) |
+| 3 | nearchair1, new start | 0.30 → **0.19** | **reached the chair again** |
+
+- **The Gate-A prediction held on hardware**: nearchair1 is the goal where flat-L2 sat on a
+  plateau and once commanded a hard wrong-direction turn; the token-cosine stack descended
+  monotonically from the 0.3 band and arrived, from two different starts. Far-band gradient →
+  committed full-clamp driving; near the floor → millimeter commands (healthy near/far behavior).
+- **Termination never fired** — the floor is ~0.19–0.28 on all three runs vs reach-thresh 0.08.
+  All three goals were **cross-session captures**; calibration's 0.01 noise floor was same-session.
+  Hypotheses: (a) stale goal images lift the floor ~0.2 (⇒ recapture goals per session), vs
+  (b) genuine basin floor (⇒ raise thresh to **0.2–0.25**, operator's working estimate).
+  **Discriminating test (deferred): park at goal, re-snapshot, rerun — floor ≲0.05 ⇒ (a).**
+- Within-floor position error is unconstrained (the "slightly left") — consistent with the floor
+  being mostly capture-condition offset.
+- **NOT yet run**: the SD-VAE baseline leg on the same starts (historical 6b behavior is the
+  implicit baseline); the `--cost-mode first` arm; the fresh-goal floor test.
+
+**Infra found+fixed this session (commits 87d1994…e0c4685):**
+- **Host lifecycle mystery SOLVED**: lerobot's LeKiwi host serves for `connection_time_s` (default
+  **30 s**!) then exits — every "connect timeout" of the day was the MPC's ~60 s checkpoint load
+  losing this race (the GPU-free probe always won it). **Launch the host with
+  `--connection_time_s 7200`** for a session. Client-side: `lekiwi_mpc` now retries connect ×3.
+- **Viewer correctness**: planner freshness verified end-to-end (ZMQ CONFLATE + observe-before-plan
+  + sweep evidence) — the "stale frame" was display semantics. Final design (operator-driven):
+  **atomic per-timestep panels** (camera | imagined +1..+H | goal land together post-plan = one
+  consistent timestep; raw `live` recorded at observe time but undisplayed), **dist trace in a row
+  below** (2-row blueprint renders fine in today's web viewer; `--viewer-flat` fallback kept),
+  status line announces `observed → PLANNING` so plan latency is visible, HUD/trace/threshold all
+  in token-cosine units. Engine: token-decoder viz under `no_grad` (crashed the interactive driver).
+- Post-reboot camera probes clean ×2 (no USB swap this time).
+
+**Future avenues (operator):** multi-camera training; reverse driving (data + `VX_MIN=0` clamp +
+CEM range) — logged in [[semantic-wm-retrain]] with C2 scoping.
+
+**Next:** fresh-goal floor test → set reach-thresh; `--cost-mode first` arm (+ the deferred
+`--gen-frames` truncation: 7.2 s → ~2.5 s replans); optional formal SD-VAE baseline legs; then C2
+recollection (multi-cam + reverse capture co-design) + retrain.

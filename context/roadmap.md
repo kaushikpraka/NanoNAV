@@ -228,7 +228,7 @@ it for LeKiwi**: the `envs/` dir has no LeKiwi/dataset env. Plan (eval-grounded,
   The metric is a **hard prerequisite** for the graph (its edges *are* `d_learned`). Steps build offline
   now (independent of the retrain); the on-robot far-goal payoff lands once the live-frame gap is also
   closed. Full design + objective derivation + pitfalls + refs: **[[learned-distance-metric]].**
-- **6e — semantic WM retrain (Option C) — 🚧 IN PROGRESS (2026-06-10).** Retrain the WM over frozen
+- **6e — semantic WM retrain (Option C) — ✅ PROTOTYPE ON-ROBOT VALIDATED (2026-06-11): 3/3 arrivals, incl. the goal flat-L2 failed; remaining C1 items = fresh-goal floor test (reach-thresh 0.08 vs 0.2–0.25), cost-mode-first arm, optional SD-VAE baseline legs → then C2 recollect+retrain.** Retrain the WM over frozen
   DINOv2 patch tokens (flow-matching/x0; NOT diffusion-forcing) so the rollout space is the
   Gate-A-validated distance space; CEM cost = token cosine (zero training). C0 probe matrix (4 short
   runs, action-atrophy kill-switch) → C0.5 viz decoder → C0-ext winner to 12k + Gate C ladder → C1
