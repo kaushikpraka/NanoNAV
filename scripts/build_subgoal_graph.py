@@ -6,6 +6,11 @@ Nodes  = real chunk-boundary frames (the token cache rows; ~4,500 from 50 episod
 Edges  = temporal (consecutive chunks within an episode — CERTIFIED: the robot drove
          that hop, turns included) + shortcut (pairs that are far in time/episode but
          < tau in token-cosine — INFERRED welds that stitch the 50 threads into one map).
+The graph is DIRECTED (operator catch 2026-06-11): temporal edges only in the driving
+direction — the robot has no reverse (VX_MIN=0, no backward training data), so an
+against-the-flow waypoint is unreachable for CEM's forward-only plans. Shortcut welds
+are bidirectional: pose-identifications ("same place+heading"), not motion. Connectivity
+is therefore reported as STRONGLY-connected components + reach-to/from coverage.
 Metric = EXACT planner parity with lekiwi_engine._dist: tokens = lat.reshape(C,-1).T
          -> [256,384], d = 1 - mean per-token cosine. Scale-invariant, so the cache's
          latent_scale convention is irrelevant here.
@@ -126,6 +131,71 @@ def build_adj(n, *edge_lists):
     return adj
 
 
+def build_directed_adj(t_edges, s_edges):
+    """Runtime semantics: temporal one-way (driving direction), welds both ways."""
+    adj = defaultdict(list)
+    for i, j, w in t_edges:
+        adj[i].append((j, max(w, 1e-6)))
+    for i, j, w in s_edges:
+        w = max(w, 1e-6)
+        adj[i].append((j, w))
+        adj[j].append((i, w))
+    return adj
+
+
+def scc(n, adj):
+    """Iterative Kosaraju -> (labels, count), labels sorted by discovery."""
+    order, seen = [], np.zeros(n, bool)
+    for s in range(n):
+        if seen[s]:
+            continue
+        seen[s] = True
+        stack = [(s, 0)]
+        while stack:
+            u, k = stack[-1]
+            if k < len(adj[u]):
+                stack[-1] = (u, k + 1)
+                v = adj[u][k][0]
+                if not seen[v]:
+                    seen[v] = True
+                    stack.append((v, 0))
+            else:
+                order.append(u)
+                stack.pop()
+    radj = defaultdict(list)
+    for u in range(n):
+        for v, _ in adj[u]:
+            radj[v].append(u)
+    comp = np.full(n, -1)
+    c = 0
+    for s in reversed(order):
+        if comp[s] >= 0:
+            continue
+        comp[s] = c
+        stack = [s]
+        while stack:
+            u = stack.pop()
+            for v in radj[u]:
+                if comp[v] < 0:
+                    comp[v] = c
+                    stack.append(v)
+        c += 1
+    return comp, c
+
+
+def reach_from(n, adj, seeds):
+    seen = np.zeros(n, bool)
+    seen[seeds] = True
+    stack = list(seeds)
+    while stack:
+        u = stack.pop()
+        for v, _ in adj[u]:
+            if not seen[v]:
+                seen[v] = True
+                stack.append(v)
+    return seen
+
+
 def components(n, adj):
     seen = np.full(n, -1)
     comp = 0
@@ -227,13 +297,24 @@ def main():
           f"({cross} cross-episode, {len(s_edges) - cross} loop-closure)")
 
     adj_t = build_adj(N, t_edges)
-    adj = build_adj(N, t_edges, s_edges)
     lab_t, n_t = components(N, adj_t)
-    lab, n_full = components(N, adj)
-    sizes = np.bincount(lab)
-    big = sizes.max()
-    print(f"[graph] components: temporal-only {n_t} (the 50 threads) -> full {n_full}; "
-          f"largest covers {big}/{N} = {100 * big / N:.1f}%")
+    # directed semantics (runtime truth): temporal one-way, welds both ways
+    dadj = build_directed_adj(t_edges, s_edges)
+    radj = defaultdict(list)
+    for u in range(N):
+        for v, w in dadj[u]:
+            radj[v].append((u, w))
+    comp, n_scc = scc(N, dadj)
+    sizes = np.bincount(comp)
+    big_id = int(np.argmax(sizes))
+    big = int(sizes[big_id])
+    core = np.nonzero(comp == big_id)[0]
+    to_core = reach_from(N, radj, core)      # nodes that can DRIVE TO the core
+    from_core = reach_from(N, dadj, core)    # nodes the core can drive to
+    print(f"[graph] DIRECTED connectivity: temporal-only {n_t} threads; {n_scc} SCCs; "
+          f"largest SCC {big}/{N} = {100 * big / N:.1f}%; "
+          f"can-reach-core {to_core.sum()}/{N} ({100 * to_core.mean():.1f}%), "
+          f"core-can-reach {from_core.sum()}/{N} ({100 * from_core.mean():.1f}%)")
 
     # wormhole audit: shortcut leverage = endpoint distance in the temporal-only graph
     print("[graph] audit: ranking shortcuts by temporal-only endpoint separation...")
@@ -289,9 +370,9 @@ cache: `{args.cache}` ({N} nodes, codec {meta.get('codec_kind')})
         f.write(f"""
 **tau = {tau:.4f}** (median at k={args.reach_chunks} chunks = one CEM reach{' — OVERRIDDEN' if args.tau else ''})
 
-## Graph
-- edges: **{len(t_edges)} temporal**, **{len(s_edges)} shortcut** ({cross} cross-episode welds, {len(s_edges) - cross} loop-closures)
-- components: temporal-only {n_t} -> **{n_full} with shortcuts**; largest component {big}/{N} nodes ({100 * big / N:.1f}%)
+## Graph (DIRECTED: temporal = driving direction only; welds bidirectional)
+- edges: **{len(t_edges)} temporal (one-way)**, **{len(s_edges)} shortcut** ({cross} cross-episode welds, {len(s_edges) - cross} loop-closures)
+- strong connectivity: {n_t} temporal threads -> **{n_scc} SCCs**; largest SCC {big}/{N} nodes ({100 * big / N:.1f}%); can-reach-core {100 * to_core.mean():.1f}%, core-can-reach {100 * from_core.mean():.1f}%
 - degree: median {int(np.median(deg))}, max {int(deg.max())}, isolated {iso}
 - shortcut degree cap {args.max_shortcut_deg}; same-episode min gap {args.min_gap} chunks
 

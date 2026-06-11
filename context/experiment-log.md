@@ -1208,3 +1208,29 @@ lock-in; (c) stuck-hop edge removal (SGM-style) deferred until observed.
 
 **Next:** on-robot graph run (same goals, cross-room starts the flat planner could never do);
 then C2 recollection feeds straight into a denser graph (the builder is data-driven end-to-end).
+
+### Addendum (same day) — the graph must be DIRECTED (operator catch)
+
+The chair→hamper route test exposed it: the undirected build routed **backwards through episode
+threads** (node runs 28→27→26, 731→…→728, 358→…→344 — temporal edges against the driving
+direction). The robot has **no reverse** (VX_MIN=0, no backward training data); an
+against-the-flow waypoint is behind the robot at a heading CEM's forward-only H=3 plans cannot
+re-acquire (turn-drive-turn for a ~2 cm hop is unplannable and out-of-distribution).
+
+**Fix:** temporal edges traversable ONLY in the driving direction (`graph.npz` already stored
+them in driving order — only the adjacency symmetrized them); shortcut welds stay bidirectional
+(pose-identifications, "same place+heading" by the sharp yaw basin — not motion). `set_goal`
+Dijkstra now runs over the REVERSED edges, so dist-to-goal is true forward-drivable distance.
+
+**Directed connectivity (the honest metric):** 92 SCCs; largest SCC 4,333/4,500 = **96.3%**;
+can-reach-core **98.2%**, core-can-reach **98.1%**. Stragglers = episode tails (chunks after a
+thread's last weld are one-way outlets) — expected, harmless.
+
+**Re-validation:** chair→hamper now traverses every within-episode run in ascending chunk order —
+48 waypoints / graph_dist 7.75 vs the illegal 41 / 6.56 (the price of looping around instead of
+backing up); final waypoint vs goal image = same hamper scene, near-identical pose
+(`route_nearchair_nearhamper_directed.png`). The three earlier routes re-pass unchanged
+(16/3/17 steps to ENDGAME) — they were already forward-flowing.
+
+**C2 tie-in:** reverse-driving capture (already a C2 future avenue) would make temporal edges
+bidirectional where reverse data exists — directly shrinking route lengths.

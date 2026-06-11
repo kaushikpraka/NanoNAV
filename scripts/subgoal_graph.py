@@ -5,9 +5,15 @@ C3 runtime — GraphNav: localize -> shortest-path tree -> hand CEM one basin at
 Library (imported by lekiwi_mpc.py with --graph) + offline route-validation CLI.
 
 Key choices:
-- ONE Dijkstra from the GOAL node at set_goal() time (graph is undirected — symmetric
-  cosine), giving every node dist-to-goal + a next-hop tree. Each replan is then just a
-  k-NN localization + a tree walk: no per-step graph search.
+- The graph is DIRECTED: temporal edges are traversable ONLY in the driving direction
+  (the robot has no reverse — VX_MIN=0, no backward data; an against-the-flow waypoint
+  is behind the robot at a heading CEM's forward-only H=3 plans cannot re-acquire).
+  Shortcut welds stay bidirectional: they are pose-identifications ("same place+heading",
+  d < tau with the sharp yaw basin), not motion. Found 2026-06-11: the first undirected
+  build routed chair->hamper backwards through episode threads (operator catch).
+- ONE Dijkstra from the GOAL node at set_goal() time, run over the REVERSED edges, giving
+  every node its true forward-drivable dist-to-goal + a next-hop tree. Each replan is then
+  just a k-NN localization + a tree walk: no per-step graph search.
 - The waypoint handed to CEM is the FURTHEST tree node within --lookahead of ROUTE
   PROGRESS (graph_dist[src] - graph_dist[node] < lookahead, default tau = one CEM reach).
   Route progress is measured in within-session calibrated units, so the ~+0.2 cross-session
@@ -50,12 +56,18 @@ class GraphNav:
         self.cache_dir = str(g["cache_dir"])
         self.frames_dir = Path(self.cache_dir) / "frames"
         self.N = len(self.episode)
-        self.adj = defaultdict(list)
-        for arr in (g["t_edges"], g["s_edges"]):
-            for i, j, w in arr:
-                i, j, w = int(i), int(j), max(float(w), 1e-6)
-                self.adj[i].append((j, w))
-                self.adj[j].append((i, w))
+        self.adj = defaultdict(list)      # DIRECTED u->[(v,w)]: hops the robot can drive
+        self.radj = defaultdict(list)     # reversed, for the goal-rooted Dijkstra
+        for i, j, w in g["t_edges"]:      # temporal: FORWARD ONLY (no reverse on the base)
+            i, j, w = int(i), int(j), max(float(w), 1e-6)
+            self.adj[i].append((j, w))
+            self.radj[j].append((i, w))
+        for i, j, w in g["s_edges"]:      # welds: same (pose, heading) -> free both ways
+            i, j, w = int(i), int(j), max(float(w), 1e-6)
+            self.adj[i].append((j, w))
+            self.adj[j].append((i, w))
+            self.radj[i].append((j, w))
+            self.radj[j].append((i, w))
         lats = np.load(Path(self.cache_dir) / "latents.npy")            # [N,C,h,w]
         self.C = int(lats.shape[1])
         t = torch.from_numpy(np.ascontiguousarray(lats)).to(device, torch.float32)
@@ -87,7 +99,9 @@ class GraphNav:
 
     # ---- goal ----
     def set_goal(self, goal_lat):
-        """Localize the goal image into the graph; Dijkstra FROM it -> dist + next-hop tree."""
+        """Localize the goal image into the graph; Dijkstra over the REVERSED edges from it ->
+        forward-drivable dist-to-goal + next-hop tree (relaxing reversed u->v = original v->u,
+        so nxt[v]=u is v's next forward hop)."""
         gn, gd = self.localize(goal_lat)
         dist = np.full(self.N, np.inf)
         nxt = np.full(self.N, -1, dtype=int)
@@ -97,7 +111,7 @@ class GraphNav:
             d, u = heapq.heappop(pq)
             if d > dist[u]:
                 continue
-            for v, w in self.adj[u]:
+            for v, w in self.radj[u]:
                 nd = d + w
                 if nd < dist[v]:
                     dist[v] = nd
