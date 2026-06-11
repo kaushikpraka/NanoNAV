@@ -92,6 +92,20 @@ de-risks the *recipe*. Far goals still need the graph: DINO cosine is appearance
   for the winning elite (viz strip survives); verify +1 bit-parity on fixed seed + re-run the
   offline CEM probe. Kept un-truncated for now for first-vs-last A/B flexibility.
 
+## Future avenues (operator, 2026-06-11 on-robot session)
+
+- **Multi-camera training** — train the WM on multiple views, not just the overhead `top` camera.
+  Implications: per-view DINO token sets (concat as extra model tokens or a view-axis), goal
+  specification becomes per-view or view-agnostic, and the cost must aggregate views. Natural
+  decision point = C2 retrain (collect all views during the recollection session regardless —
+  cameras are free at capture time even if v1 trains on `top` only).
+- **Reverse driving in the training data** — the dataset (and the velocity clamp: `VX_MIN=0`)
+  is forward-only today, so the planner literally cannot back out of an overshoot; it must turn
+  around. Needs: teleop segments driving in reverse during recollection, clamp widened to
+  negative vx, and the CEM sampling range opened up. Cheap to capture, high value for
+  close-quarters goal approach. Also pairs with the asymmetry question in
+  [[learned-distance-metric]] (forward vs U-turn cost).
+
 ## Risks
 
 Finding-#4 repro on all arms (escalation: film injection → aux action-decode loss → V-JEPA 2.1
