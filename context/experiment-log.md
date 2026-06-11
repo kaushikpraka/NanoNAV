@@ -1234,3 +1234,34 @@ backing up); final waypoint vs goal image = same hamper scene, near-identical po
 
 **C2 tie-in:** reverse-driving capture (already a C2 future avenue) would make temporal edges
 bidirectional where reverse data exists — directly shrinking route lengths.
+
+### Addendum 2 (same day) — welds must be DIRECTION-CERTIFIED too (operator catch #2)
+
+One-way temporal edges weren't enough: the row2253→nearfan2 route still ended with the goal
+BEHIND the arrival node. Cause: welds admitted at τ=0.182 span up to ~3 chunks of pose in ANY
+direction — each bidirectional weld can silently move the virtual pose ~10 cm backward, and the
+endgame then needs reverse.
+
+**Threshold sweep ruled out the simple fix**: tightening welds to identification radius collapses
+the graph (τ_weld=0.10 → largest SCC 32%, 3/4 routes UNREACHABLE) — 50 episodes don't revisit
+poses precisely enough.
+
+**Fix: motion-parallax direction certification** (zero new data; uses the threads we already
+trust). For candidate weld i→j: **fwd** = some 1–3-chunk temporal successor of i gets closer to j
+(j provably ahead; margin 0.015); **soft** = only the approach history certifies (predecessors
+were farther) — j may be ≤2 chunks behind, so soft edges carry a +0.15 Dijkstra penalty and are
+used only when no fwd alternative exists; **ident** = d < τ_id (k=1 median 0.092, same pose) —
+bidirectional. Result: **17,796 directed welds (1,760 ident / 6,636 fwd / 9,400 soft)**, largest
+SCC **94.5%**, can-reach-core **97.4%** — connectivity essentially recovered with direction
+guarantees where the data supports them.
+
+**Re-validation:** fan route restructured — three fwd-certified welds, the single soft edge only
+at the terminal hop into the goal node (where ENDGAME takes over; residual ≤ ~2 chunks ≈ the
+existing endgame slack, recoverable by replan + legal rotation). All other routes re-pass
+(nearchair 14 steps, nearhamper 16, chair→hamper 50). `graph.npz` format bumped
+(`directed_welds=True`; GraphNav rejects the old format with a rebuild message).
+
+**Honest residuals:** soft edges bound backward error to ~2 chunks but don't eliminate it; the
+final-cm placement question stays with the C1 floor work and the visual-servo endgame idea
+(which can use reverse — it bypasses the WM, so VX_MIN=0 doesn't apply). C2 recollection with
+reverse segments turns temporal edges bidirectional where reverse was actually driven.

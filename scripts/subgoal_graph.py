@@ -8,9 +8,12 @@ Key choices:
 - The graph is DIRECTED: temporal edges are traversable ONLY in the driving direction
   (the robot has no reverse — VX_MIN=0, no backward data; an against-the-flow waypoint
   is behind the robot at a heading CEM's forward-only H=3 plans cannot re-acquire).
-  Shortcut welds stay bidirectional: they are pose-identifications ("same place+heading",
-  d < tau with the sharp yaw basin), not motion. Found 2026-06-11: the first undirected
-  build routed chair->hamper backwards through episode threads (operator catch).
+  Shortcut welds are DIRECTION-CERTIFIED at build time (motion parallax along the
+  threads; see build_subgoal_graph.py): ident = same pose (bidirectional), fwd =
+  succ-certified ahead, soft = pred-only (Dijkstra-penalized). Two operator catches
+  2026-06-11: undirected temporal edges routed chair->hamper backwards through threads;
+  then bidirectional tau-radius welds (~3 chunks of pose slack in any direction) still
+  let row2253->nearfan2 end with the goal BEHIND the arrival node.
 - ONE Dijkstra from the GOAL node at set_goal() time, run over the REVERSED edges, giving
   every node its true forward-drivable dist-to-goal + a next-hop tree. Each replan is then
   just a k-NN localization + a tree walk: no per-step graph search.
@@ -56,17 +59,18 @@ class GraphNav:
         self.cache_dir = str(g["cache_dir"])
         self.frames_dir = Path(self.cache_dir) / "frames"
         self.N = len(self.episode)
+        if "directed_welds" not in g:
+            raise RuntimeError(f"{graph_dir}/graph.npz is the old bidirectional-weld format — "
+                               f"rebuild with scripts/build_subgoal_graph.py (direction-certified welds)")
         self.adj = defaultdict(list)      # DIRECTED u->[(v,w)]: hops the robot can drive
         self.radj = defaultdict(list)     # reversed, for the goal-rooted Dijkstra
         for i, j, w in g["t_edges"]:      # temporal: FORWARD ONLY (no reverse on the base)
             i, j, w = int(i), int(j), max(float(w), 1e-6)
             self.adj[i].append((j, w))
             self.radj[j].append((i, w))
-        for i, j, w in g["s_edges"]:      # welds: same (pose, heading) -> free both ways
-            i, j, w = int(i), int(j), max(float(w), 1e-6)
+        for i, j, w in g["s_edges"]:      # welds: direction-certified rows (ident = two rows;
+            i, j, w = int(i), int(j), max(float(w), 1e-6)   # soft already carries its penalty)
             self.adj[i].append((j, w))
-            self.adj[j].append((i, w))
-            self.radj[i].append((j, w))
             self.radj[j].append((i, w))
         lats = np.load(Path(self.cache_dir) / "latents.npy")            # [N,C,h,w]
         self.C = int(lats.shape[1])

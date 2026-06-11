@@ -6,11 +6,19 @@ Nodes  = real chunk-boundary frames (the token cache rows; ~4,500 from 50 episod
 Edges  = temporal (consecutive chunks within an episode — CERTIFIED: the robot drove
          that hop, turns included) + shortcut (pairs that are far in time/episode but
          < tau in token-cosine — INFERRED welds that stitch the 50 threads into one map).
-The graph is DIRECTED (operator catch 2026-06-11): temporal edges only in the driving
+The graph is DIRECTED (operator catches 2026-06-11): temporal edges only in the driving
 direction — the robot has no reverse (VX_MIN=0, no backward training data), so an
-against-the-flow waypoint is unreachable for CEM's forward-only plans. Shortcut welds
-are bidirectional: pose-identifications ("same place+heading"), not motion. Connectivity
-is therefore reported as STRONGLY-connected components + reach-to/from coverage.
+against-the-flow waypoint is unreachable for CEM's forward-only plans. Shortcut welds are
+DIRECTION-CERTIFIED by motion parallax along the certified threads (second operator catch:
+a weld at d<tau spans up to ~3 chunks of pose in ANY direction — bidirectional welds let
+routes drift backward even with one-way temporal edges). Grades:
+  ident  d < tau_id (~k=1: same pose within one chunk)        -> bidirectional, w = d
+  fwd    a 1-3-chunk temporal successor of i gets CLOSER to j -> i->j only,     w = d
+  soft   only the approach history certifies (pred moving     -> i->j only,
+         toward i was farther from j); may be ~<=2 chunks        w = d + soft-penalty
+         behind — recoverable by replan, but Dijkstra should     (prefer fwd routes)
+         only use it when no fwd alternative exists
+Connectivity is reported as STRONGLY-connected components + reach-to/from coverage.
 Metric = EXACT planner parity with lekiwi_engine._dist: tokens = lat.reshape(C,-1).T
          -> [256,384], d = 1 - mean per-token cosine. Scale-invariant, so the cache's
          latent_scale convention is irrelevant here.
@@ -98,26 +106,80 @@ def temporal_edges(D, ep, ck):
     return edges
 
 
-def shortcut_edges(D, ep, ck, tau, min_gap, max_deg):
-    """Cross-episode (or same-episode loop-closure, |dchunk|>min_gap) pairs with d<tau.
-    Per-node degree cap keeps junction neighborhoods from becoming cliques."""
+def successor_chains(ep, ck, K=3):
+    """succ/pred chains along temporal threads: S[k][i] = i's (k+1)-chunk successor (-1 = none)."""
+    N = len(ep)
+    succ = np.full(N, -1, int)
+    pred = np.full(N, -1, int)
+    order = np.lexsort((ck, ep))
+    for a, b in zip(order[:-1], order[1:]):
+        if ep[a] == ep[b] and ck[b] - ck[a] == 1:
+            succ[a], pred[b] = b, a
+    S, P = [succ], [pred]
+    for _ in range(K - 1):
+        S.append(np.where(S[-1] >= 0, succ[S[-1]], -1))
+        P.append(np.where(P[-1] >= 0, pred[P[-1]], -1))
+    return S, P
+
+
+def shortcut_edges(D, ep, ck, tau, tau_id, margin, min_gap, max_deg, soft_penalty):
+    """DIRECTED, direction-certified welds -> list of (i, j, w_effective, grade).
+
+    Candidates: pairs far in time/episode with d < tau. Direction is certified by motion
+    parallax along the certified threads (no pose ground truth needed):
+      ident: d < tau_id (same pose within ~one chunk)            -> both directions, w=d
+      fwd:   D[succ_k(i), j] < D[i,j] - margin for some k<=3     -> i->j, w=d
+      soft:  D[pred_k(i), j] > D[i,j] + margin for some k<=3     -> i->j, w=d+soft_penalty
+             (approach was converging on j; j may be ~<=2 chunks behind — Dijkstra-deprioritized)
+    Admitted closest-first under per-node out/in degree caps."""
     N = D.shape[0]
     cand = D < tau
     same = ep[:, None] == ep[None, :]
-    near_t = same & (np.abs(ck[:, None] - ck[None, :]) <= min_gap)
-    cand &= ~near_t                                            # temporal's job
+    cand &= ~(same & (np.abs(ck[:, None] - ck[None, :]) <= min_gap))   # temporal's job
     cand &= np.triu(np.ones_like(cand), k=1).astype(bool)
     ii, jj = np.nonzero(cand)
-    order = np.argsort(D[ii, jj])                              # admit closest first
-    deg = defaultdict(int)
+    d_pair = D[ii, jj]
+    S, P = successor_chains(ep, ck)
+
+    def fwd_test(src, dst):
+        base = D[src, dst]
+        ok = np.zeros(len(src), bool)
+        for Sk in S:
+            s = Sk[src]
+            v = s >= 0
+            ok[v] |= D[s[v], dst[v]] < base[v] - margin
+        return ok
+
+    def soft_test(src, dst):
+        base = D[src, dst]
+        ok = np.zeros(len(src), bool)
+        for Pk in P:
+            p = Pk[src]
+            v = p >= 0
+            ok[v] |= D[p[v], dst[v]] > base[v] + margin
+        return ok
+
+    ident = d_pair < tau_id
+    f_ij = fwd_test(ii, jj) & ~ident
+    f_ji = fwd_test(jj, ii) & ~ident
+    s_ij = soft_test(ii, jj) & ~ident & ~f_ij
+    s_ji = soft_test(jj, ii) & ~ident & ~f_ji
+    raw = []
+    for a, b, mask, grade, pen in ((ii, jj, ident, "ident", 0.0), (jj, ii, ident, "ident", 0.0),
+                                   (ii, jj, f_ij, "fwd", 0.0), (jj, ii, f_ji, "fwd", 0.0),
+                                   (ii, jj, s_ij, "soft", soft_penalty),
+                                   (jj, ii, s_ji, "soft", soft_penalty)):
+        raw += [(int(x), int(y), float(D[x, y] + pen), grade)
+                for x, y in zip(a[mask], b[mask])]
+    raw.sort(key=lambda e: e[2])                               # admit closest (penalized) first
+    outdeg, indeg = defaultdict(int), defaultdict(int)
     edges = []
-    for t_ in order:
-        i, j = int(ii[t_]), int(jj[t_])
-        if deg[i] >= max_deg or deg[j] >= max_deg:
+    for i, j, w, grade in raw:
+        if outdeg[i] >= max_deg or indeg[j] >= max_deg:
             continue
-        deg[i] += 1
-        deg[j] += 1
-        edges.append((i, j, float(D[i, j])))
+        outdeg[i] += 1
+        indeg[j] += 1
+        edges.append((i, j, w, grade))
     return edges
 
 
@@ -132,14 +194,14 @@ def build_adj(n, *edge_lists):
 
 
 def build_directed_adj(t_edges, s_edges):
-    """Runtime semantics: temporal one-way (driving direction), welds both ways."""
+    """Runtime semantics: temporal one-way (driving direction); welds are already directed
+    rows (ident pairs appear as two rows)."""
     adj = defaultdict(list)
     for i, j, w in t_edges:
         adj[i].append((j, max(w, 1e-6)))
-    for i, j, w in s_edges:
-        w = max(w, 1e-6)
-        adj[i].append((j, w))
-        adj[j].append((i, w))
+    for e in s_edges:
+        i, j, w = e[0], e[1], e[2]
+        adj[i].append((j, max(w, 1e-6)))
     return adj
 
 
@@ -265,6 +327,12 @@ def main():
     ap.add_argument("--min-gap", type=int, default=5,
                     help="same-episode pairs closer than this many chunks are temporal-only")
     ap.add_argument("--max-shortcut-deg", type=int, default=8)
+    ap.add_argument("--tau-id", type=float, default=None,
+                    help="same-pose identification radius (default: calibration median at k=1)")
+    ap.add_argument("--margin", type=float, default=0.015,
+                    help="motion-parallax certification margin for weld direction")
+    ap.add_argument("--soft-penalty", type=float, default=0.15,
+                    help="Dijkstra weight penalty on soft (pred-only certified) welds")
     ap.add_argument("--audit-n", type=int, default=24)
     ap.add_argument("--device", default="cuda")
     args = ap.parse_args()
@@ -290,11 +358,16 @@ def main():
           f"k={args.reach_chunks} median {k_reach['median']:.4f} (p25 {k_reach['p25']:.4f}) | "
           f"k=10 median {cal[9]['median']:.4f}  -> tau={tau:.4f}")
 
+    tau_id = args.tau_id if args.tau_id is not None else float(cal[0]["median"])
     t_edges = temporal_edges(D, ep, ck)
-    s_edges = shortcut_edges(D, ep, ck, tau, args.min_gap, args.max_shortcut_deg)
-    cross = sum(1 for i, j, _ in s_edges if ep[i] != ep[j])
-    print(f"[graph] edges: {len(t_edges)} temporal, {len(s_edges)} shortcut "
-          f"({cross} cross-episode, {len(s_edges) - cross} loop-closure)")
+    s_edges = shortcut_edges(D, ep, ck, tau, tau_id, args.margin, args.min_gap,
+                             args.max_shortcut_deg, args.soft_penalty)
+    cross = sum(1 for e in s_edges if ep[e[0]] != ep[e[1]])
+    by_grade = {g: sum(1 for e in s_edges if e[3] == g) for g in ("ident", "fwd", "soft")}
+    print(f"[graph] edges: {len(t_edges)} temporal (one-way), {len(s_edges)} directed welds "
+          f"(ident {by_grade['ident']} / fwd {by_grade['fwd']} / soft {by_grade['soft']}; "
+          f"{cross} cross-episode); tau_id={tau_id:.3f} margin={args.margin} "
+          f"soft_penalty={args.soft_penalty}")
 
     adj_t = build_adj(N, t_edges)
     lab_t, n_t = components(N, adj_t)
@@ -318,8 +391,12 @@ def main():
 
     # wormhole audit: shortcut leverage = endpoint distance in the temporal-only graph
     print("[graph] audit: ranking shortcuts by temporal-only endpoint separation...")
-    lev = []
-    for i, j, w in s_edges:
+    lev, seen_pairs = [], set()
+    for i, j, w, grade in s_edges:
+        key = (min(i, j), max(i, j))
+        if key in seen_pairs:
+            continue
+        seen_pairs.add(key)
         if lab_t[i] != lab_t[j]:
             g = np.inf                                          # weld between threads
         else:
@@ -347,12 +424,18 @@ def main():
              episode=ep, chunk_idx=ck,
              frame_idx=np.array([int(r["frame_idx"]) for r in rows]),
              t_edges=np.array([(i, j, w) for i, j, w in t_edges], dtype=np.float64),
-             s_edges=np.array([(i, j, w) for i, j, w in s_edges], dtype=np.float64),
-             tau=tau, reach_chunks=args.reach_chunks,
+             s_edges=np.array([(i, j, w) for i, j, w, _ in s_edges], dtype=np.float64),
+             s_grade=np.array([g for _, _, _, g in s_edges]),
+             directed_welds=True,
+             tau=tau, tau_id=tau_id, margin=args.margin, soft_penalty=args.soft_penalty,
+             reach_chunks=args.reach_chunks,
              cache_dir=os.path.abspath(args.cache))
 
     deg = np.zeros(N, int)
-    for i, j, _ in t_edges + s_edges:
+    for i, j, _ in t_edges:
+        deg[i] += 1
+        deg[j] += 1
+    for i, j, _, _ in s_edges:
         deg[i] += 1
         deg[j] += 1
     iso = int((deg == 0).sum())
@@ -370,8 +453,8 @@ cache: `{args.cache}` ({N} nodes, codec {meta.get('codec_kind')})
         f.write(f"""
 **tau = {tau:.4f}** (median at k={args.reach_chunks} chunks = one CEM reach{' — OVERRIDDEN' if args.tau else ''})
 
-## Graph (DIRECTED: temporal = driving direction only; welds bidirectional)
-- edges: **{len(t_edges)} temporal (one-way)**, **{len(s_edges)} shortcut** ({cross} cross-episode welds, {len(s_edges) - cross} loop-closures)
+## Graph (DIRECTED: temporal = driving direction only; welds direction-certified)
+- edges: **{len(t_edges)} temporal (one-way)**, **{len(s_edges)} directed welds** — ident {by_grade['ident']} (d<tau_id={tau_id:.3f}, bidirectional), fwd {by_grade['fwd']} (succ-certified ahead), soft {by_grade['soft']} (pred-only; +{args.soft_penalty} Dijkstra penalty); {cross} cross-episode
 - strong connectivity: {n_t} temporal threads -> **{n_scc} SCCs**; largest SCC {big}/{N} nodes ({100 * big / N:.1f}%); can-reach-core {100 * to_core.mean():.1f}%, core-can-reach {100 * from_core.mean():.1f}%
 - degree: median {int(np.median(deg))}, max {int(deg.max())}, isolated {iso}
 - shortcut degree cap {args.max_shortcut_deg}; same-episode min gap {args.min_gap} chunks
