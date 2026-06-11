@@ -133,6 +133,9 @@ def main():
     ap.add_argument("--episodes", default=None, help="subset 'a:b' (default all)")
     ap.add_argument("--batch", type=int, default=32)
     ap.add_argument("--fp16", action="store_true")
+    ap.add_argument("--save-frames", action="store_true",
+                    help="also write frames/{row:05d}.jpg per cache row (raw camera RGB; runtime "
+                         "goal handoff + filmstrips re-letterbox through the normal engine path)")
     ap.add_argument("--out", required=True)
     args = ap.parse_args()
 
@@ -157,6 +160,8 @@ def main():
           f"size={size}, encoder={enc.desc['encoder']}")
 
     os.makedirs(args.out, exist_ok=True)
+    if args.save_frames:
+        os.makedirs(os.path.join(args.out, "frames"), exist_ok=True)
     lat_rows, idx_rows = [], []
     for ep in episodes:
         pq, mp4 = episode_paths(args.root, ep)
@@ -169,10 +174,15 @@ def main():
         for i in range(0, len(tensors), args.batch):
             lats.append(enc.encode(tensors[i:i + args.batch]))
         lats = torch.cat(lats)
-        for k, (fi, _) in enumerate(frames):
-            idx_rows.append({"row": len(idx_rows), "episode": ep, "chunk_idx": fi // stride,
+        for k, (fi, rgb) in enumerate(frames):
+            row = len(idx_rows)
+            idx_rows.append({"row": row, "episode": ep, "chunk_idx": fi // stride,
                              "frame_idx": fi,
                              "video_rel": str(mp4.relative_to(args.root))})
+            if args.save_frames:
+                from PIL import Image
+                Image.fromarray(rgb).save(os.path.join(args.out, "frames", f"{row:05d}.jpg"),
+                                          quality=90)
         lat_rows.append(lats)
         print(f"[cache] ep{ep}: {len(frames)} frames -> latents {tuple(lats.shape[1:])}")
 

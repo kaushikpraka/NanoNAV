@@ -1156,3 +1156,55 @@ CEM range) — logged in [[semantic-wm-retrain]] with C2 scoping.
 **Next:** fresh-goal floor test → set reach-thresh; `--cost-mode first` arm (+ the deferred
 `--gen-frames` truncation: 7.2 s → ~2.5 s replans); optional formal SD-VAE baseline legs; then C2
 recollection (multi-cam + reverse capture co-design) + retrain.
+
+## 2026-06-11 (C3 SUBGOAL GRAPH — BUILT + OFFLINE-VALIDATED)
+
+**The token-space subgoal graph is built, audited, and integrated into the MPC** (on-robot test
+pending). Far goals no longer ask the metric a far question: Dijkstra over real frames routes the
+room; CEM only ever chases a waypoint ~one reach away — the regime that went 3/3 on-robot.
+
+**Substrate** — `results/token_cache/`: all 4,500 chunk-boundary frames (50 eps, stride 10)
+re-encoded with the 12k semantic ckpt's frozen DINOv2 codec → [384,16,16] fp16 + per-row JPEGs
+(`--save-frames`, new). Metric = exact `lekiwi_engine._dist` parity (channel-major reshape →
+256 tokens, 1 − mean per-token cos).
+
+**Calibration** (`results/subgoal_graph/calibration.csv`, within-episode pairs at chunk gap k):
+k=1 → 0.092, k=3 → 0.182, k=10 → 0.330 (medians). Far-pair median 0.454 (the plateau, again).
+**τ = 0.182** = one CEM reach (H=3 chunks), read off the curve, not guessed.
+
+**Graph** (`scripts/build_subgoal_graph.py` → `results/subgoal_graph/graph.npz`):
+- 4,500 nodes; **4,450 temporal edges** (certified — the robot drove them) + **10,061 shortcut
+  welds** (8,973 cross-episode, 1,088 loop-closure; d < τ, per-node degree cap 8, same-episode
+  pairs within 5 chunks excluded).
+- Connectivity: 50 disconnected threads → **ONE component, 100% coverage**.
+- **Wormhole audit PASS**: shortcuts ranked by temporal-only endpoint separation (highest-leverage
+  = most suspicious); top-leverage + random montages (`audit/*.png`) all show the same physical
+  place at near-identical pose. The low-texture-rug wormhole risk did not materialize at τ=0.182.
+
+**Offline route validation** (`scripts/subgoal_graph.py --route`, simulated replan loop, filmstrips
+in `results/subgoal_graph/route_*.png`): 3/3 routes reach ENDGAME — row0→nearchair (16 waypoints,
+stitches ≥3 episodes), row2253→nearfan2 (3), row4498→**nearhamper** (16 waypoints across ≥6
+episodes into the formerly-OOD region, ends graph_dist 0.075). Filmstrips read as one continuous
+drive; per-step progress ~0.13–0.15 token-cos ≈ one CEM reach. Goal-image localization d_loc
+0.19–0.27 — the cross-session offset again, exactly as on-robot.
+
+**Design decision (offset-driven):** waypoint lookahead = **route progress** (graph_dist[src] −
+graph_dist[node] < τ, within-session calibrated units) — NOT live-frame distance, which the ~+0.2
+cross-session offset would collapse to 1-hop (~2 cm) crawling.
+
+**Runtime** (`lekiwi_mpc.py --graph results/subgoal_graph`): per replan localize live frame
+(k-NN over cached tokens, **11 ms** measured — free vs the 7 s plan) → walk the goal-rooted
+Dijkstra tree → waypoint's REAL cached frame becomes the plan goal through the unchanged
+`planner.plan` path. ENDGAME (graph_dist < τ) hands CEM the actual `--goal` image, so the final
+approach keeps the validated reach-thresh semantics; **reach-thresh termination is gated to
+endgame only** (dist_to_goal is to-waypoint while routing). Viewer: goal panel = current waypoint;
+second time-series `graph_dist` = calibrated route distance to the FINAL goal (the monotone
+progress signal `dist_to_goal` never was). GPU smoke test green (WAYPOINT plan + ENDGAME trigger).
+
+**Open before on-robot:** (a) the localization floor on LIVE frames is the same cross-session
+offset question (C1's fresh-goal test now covers both); (b) waypoint switch cadence under real
+(imperfect) motion — replan-every-step recomputes everything, so failure mode is dithering, not
+lock-in; (c) stuck-hop edge removal (SGM-style) deferred until observed.
+
+**Next:** on-robot graph run (same goals, cross-room starts the flat planner could never do);
+then C2 recollection feeds straight into a denser graph (the builder is data-driven end-to-end).

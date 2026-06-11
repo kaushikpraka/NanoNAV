@@ -231,19 +231,27 @@ def rr_init(args):
             for i in range(2, H + 1):
                 views.append(rrb.Spatial2DView(origin=f"rollout/h{i}",
                                                name=f"imagined +{i}" + (" (CEM target)" if i == H else "")))
-            views.append(rrb.Spatial2DView(origin="model/goal", name="goal"))
+            graph_mode = bool(getattr(args, "graph", None))
+            views.append(rrb.Spatial2DView(origin="model/goal",
+                                           name="target (waypoint)" if graph_mode else "goal"))
             if getattr(args, "viewer_flat", False):
                 bp = rrb.Blueprint(rrb.Horizontal(*views), auto_views=False, collapse_panels=True)
             else:
+                ts = [rrb.TimeSeriesView(origin="dist_to_goal",
+                                         name="dist (to waypoint)" if graph_mode else "dist")]
+                if graph_mode:
+                    ts.append(rrb.TimeSeriesView(origin="graph_dist", name="route dist to GOAL"))
                 bp = rrb.Blueprint(
                     rrb.Vertical(rrb.Horizontal(*views),
-                                 rrb.TimeSeriesView(origin="dist_to_goal", name="dist"),
+                                 ts[0] if len(ts) == 1 else rrb.Horizontal(*ts),
                                  row_shares=[3, 1]),
                     auto_views=False, collapse_panels=True)
             for rec in viewer_recs:
                 rr.send_blueprint(bp, recording=rec) if rec is not None else rr.send_blueprint(bp)
             mode = "flat" if getattr(args, "viewer_flat", False) else "2-row"
-            print(f"[rerun] viewer blueprint ({mode}): camera | imagined +1..+{H} | goal" + ("" if mode == "flat" else "  /  dist below"))
+            tgt = "waypoint" if graph_mode else "goal"
+            below = "" if mode == "flat" else ("  /  dist + route-dist below" if graph_mode else "  /  dist below")
+            print(f"[rerun] viewer blueprint ({mode}): camera | imagined +1..+{H} | {tgt}{below}")
         except Exception as e:
             print(f"[rerun] blueprint skipped ({e}) — viewer falls back to auto-layout")
     return (rr, streams) if streams else None
@@ -298,7 +306,7 @@ def rr_log_observed(ctx, step, frame):
             print(f"[rerun] observe-time log failed ({e})")
 
 
-def rr_log(ctx, step, frame, goal, res: PlanResult, executed):
+def rr_log(ctx, step, frame, goal, res: PlanResult, executed, graph=None):
     if ctx is None:
         return
     rr, streams = ctx
@@ -308,6 +316,12 @@ def rr_log(ctx, step, frame, goal, res: PlanResult, executed):
         arrow = _action_arrow(rr, executed[0], executed[1])
     except Exception as e:
         print(f"[rerun] arrow build failed ({e})")
+    status = f"step {step}: plan ready -> executing"
+    if graph is not None:
+        status += (f" | graph: {graph['status']} hops={graph.get('hops_left', '-')} "
+                   f"graph_dist={graph['graph_dist']:.3f}"
+                   + (f" wp=ep{graph['wp_ep']}ck{graph['wp_ck']}"
+                      if graph["status"] == "WAYPOINT" else ""))
     for rec in streams:                                  # tee to every active sink (file and/or live)
         try:
             _rr_set_time(rr, step, rec)
@@ -318,8 +332,10 @@ def rr_log(ctx, step, frame, goal, res: PlanResult, executed):
                 rr.log("model/live", rr.Image(res.model_live_rgb), recording=rec)
             if res.model_goal_rgb is not None:
                 rr.log("model/goal", rr.Image(res.model_goal_rgb), recording=rec)
-            rr.log("status", rr.TextLog(f"step {step}: plan ready -> executing"), recording=rec)
+            rr.log("status", rr.TextLog(status), recording=rec)
             rr.log("dist_to_goal", Scalar(res.dist_to_goal), recording=rec)
+            if graph is not None and np.isfinite(graph.get("graph_dist", np.inf)):
+                rr.log("graph_dist", Scalar(graph["graph_dist"]), recording=rec)
             rr.log("cmd/vx", Scalar(executed[0]), recording=rec)
             rr.log("cmd/theta_deg", Scalar(executed[1]), recording=rec)
             if res.cem_loss is not None:
@@ -383,6 +399,15 @@ def main():
     ap.add_argument("--cost-mode", choices=["last", "first", "all"], default="last",
                     help="which imagined frame(s) the cost scores: last=+H endpoint (6b behavior), "
                          "first=+1 chunk (least WM-degraded, the chunk actually executed), all=exp-weighted")
+    ap.add_argument("--graph", default=None, metavar="DIR",
+                    help="C3 subgoal-graph dir (build_subgoal_graph.py output). Per replan: localize the "
+                         "live frame in token space, route to the goal, hand CEM the waypoint ~one CEM "
+                         "reach ahead (a REAL cached frame); the final hop falls back to the actual "
+                         "--goal image, so endgame keeps the validated reach-thresh semantics.")
+    ap.add_argument("--graph-lookahead", type=float, default=None,
+                    help="waypoint route-progress budget in calibrated token-cos units (default: the "
+                         "graph's tau = one CEM reach). Route progress, not live distance — immune to "
+                         "the ~+0.2 cross-session offset.")
     ap.add_argument("--token-decoder", default=None,
                     help="train_token_decoder.py checkpoint for imagined-rollout viz with semantic ckpts")
     ap.add_argument("--var-scale", type=float, default=1.0,
@@ -425,6 +450,17 @@ def main():
         print(f"[goal] {args.goal}  shape={goal.shape}")
 
     planner = make_planner(args)
+
+    # C3 subgoal graph: goal -> Dijkstra tree once, then each replan localizes + picks a waypoint
+    nav = None
+    if args.graph:
+        if args.planner != "wm":
+            sys.exit("--graph needs --planner wm (localization runs in the ckpt's token space)")
+        from subgoal_graph import GraphNav
+        nav = GraphNav(args.graph, device=args.device)
+        zg = planner._encode_last({"visual": planner._preprocess(goal)})
+        nav.set_goal(zg.flatten())
+
     tel = rr_init(args)
 
     # connect — MUST request the `top` camera explicitly; lerobot's client default exposes only
@@ -479,9 +515,21 @@ def main():
         frame = get_top_frame(robot)
         rr_log_observed(tel, step, frame)
 
-        # 3. PLAN
+        # 3. PLAN — graph mode plans toward the current waypoint (a REAL cached frame ~one CEM
+        #    reach ahead on the route); ENDGAME (last hop) / UNREACHABLE fall back to the real goal.
+        plan_goal, ginfo = goal, None
+        if nav is not None:
+            z_live = planner._encode_last({"visual": planner._preprocess(frame)})
+            wp, wp_frame, ginfo = nav.waypoint(z_live.flatten(), args.graph_lookahead)
+            if ginfo["status"] == "WAYPOINT":
+                plan_goal = wp_frame
+            print(f"  graph: {ginfo['status']}  src={ginfo['src']} (ep{ginfo['src_ep']} ck{ginfo['src_ck']}) "
+                  f"d_loc={ginfo['d_loc']:.3f}  graph_dist={ginfo['graph_dist']:.3f}  "
+                  f"hops={ginfo.get('hops_left', '-')}"
+                  + (f"  -> wp {ginfo['wp']} (ep{ginfo['wp_ep']} ck{ginfo['wp_ck']})"
+                     if ginfo["status"] == "WAYPOINT" else "  -> REAL GOAL IMAGE"))
         t0 = time.monotonic()
-        res = planner.plan(frame, goal)
+        res = planner.plan(frame, plan_goal)
         plan_ms = (time.monotonic() - t0) * 1000.0
 
         # 4. EXECUTE (clamp + scale) — compute now so telemetry logs what we actually send.
@@ -496,14 +544,18 @@ def main():
             vx, th = lk.clamp_velocity(res.vx * args.speed_scale, res.theta_deg * args.speed_scale)
             cmd_src = "cem"
 
-        # 5. TELEMETRY
-        rr_log(tel, step, frame, goal if goal is not None else frame, res, (vx, th))
+        # 5. TELEMETRY — graph mode: the goal panel shows the CURRENT WAYPOINT (what CEM is
+        #    actually chasing); graph_dist is the calibrated route distance to the FINAL goal
+        #    (the monotone progress signal; dist_to_goal is only to the waypoint while routing).
+        rr_log(tel, step, frame, plan_goal if plan_goal is not None else frame, res, (vx, th),
+               graph=ginfo)
         print(f"  step {step:>2}/{args.max_steps}  dist={res.dist_to_goal:7.2f}  plan={plan_ms:6.0f}ms  "
               f"[{cmd_src}] → x.vel={vx:.3f} theta.vel={th:+.2f}"
               + (f"  (cem would: vx={res.vx:.3f} θ={res.theta_deg:+.1f})" if cmd_src == "straight" else ""))
 
-        # 6. TERMINATE?
-        if res.dist_to_goal < args.reach_thresh:
+        # 6. TERMINATE? — while routing, dist_to_goal is to the WAYPOINT; only the endgame
+        #    (planning toward the real goal image) may terminate on reach-thresh.
+        if res.dist_to_goal < args.reach_thresh and (ginfo is None or ginfo["status"] != "WAYPOINT"):
             reached = True
             print(f"[mpc] reached: dist {res.dist_to_goal:.2f} < {args.reach_thresh}")
             break
