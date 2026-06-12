@@ -96,6 +96,9 @@ class GraphNav:
         self.track_window = 12        # on-path localization window (hops ahead)
         self.loc_margin = 0.03        # global must beat on-path by this to count as off-route
         self.reroute_patience = 2     # consecutive off-route replans before accepting a reroute
+        self.min_wp_hops = 5          # waypoint floor: >= path[5] so the target frame differs
+                                      # enough from the live frame to give CEM a real gradient
+                                      # (was 3; sparsified 2026-06-12 — rides the basin edge)
         print(f"[graphnav] {self.N} nodes, tau={self.tau:.3f}, tokens on {device}")
 
     # ---- metric (engine._dist parity) ----
@@ -152,7 +155,7 @@ class GraphNav:
         """-> (node_id, frame_rgb, info) or (None, None, info) = ENDGAME (use the real goal image).
         info: src node, d_loc, graph dist-to-goal, hops_left, waypoint d_live."""
         assert self.goal_node is not None, "set_goal first"
-        lookahead = lookahead or 2.0 * self.tau   # ~4 chunks/waypoint (gradient-basin calibration)
+        lookahead = lookahead or 2.5 * self.tau   # ~5 chunks/waypoint (basin edge; floor usually binds)
         d_all = self.dists_to_all(live_lat)
         g = int(np.argmin(d_all))
         s, mode = g, "global"
@@ -189,7 +192,7 @@ class GraphNav:
             if n == self.goal_node:                 # RAW route progress (soft-weld penalties are
                 break                               # routing costs, not physical distance)
             progress += self.w_raw.get((path[m - 1], n), 0.0)
-            if progress < lookahead:
+            if progress < lookahead or m <= self.min_wp_hops:
                 wp = n
             else:
                 break
