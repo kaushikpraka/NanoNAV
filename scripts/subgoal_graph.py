@@ -89,6 +89,13 @@ class GraphNav:
         self.goal_node = None
         self.dist_to_goal = None      # [N] graph distance
         self.next_hop = None          # [N] next node toward goal (-1 = goal/unreachable)
+        # localization hysteresis / route stickiness (on-robot 2026-06-12: per-replan global
+        # argmin flip-flopped across episodes -> route thrashed 65/66/67/73 hops, graph_dist rose)
+        self._path = None             # committed route (node list, src..goal)
+        self._off_route = 0           # consecutive replans where global beat on-path by margin
+        self.track_window = 12        # on-path localization window (hops ahead)
+        self.loc_margin = 0.03        # global must beat on-path by this to count as off-route
+        self.reroute_patience = 2     # consecutive off-route replans before accepting a reroute
         print(f"[graphnav] {self.N} nodes, tau={self.tau:.3f}, tokens on {device}")
 
     # ---- metric (engine._dist parity) ----
@@ -130,6 +137,7 @@ class GraphNav:
                     nxt[v] = u                                          # v's next hop toward goal
                     heapq.heappush(pq, (nd, v))
         self.goal_node, self.dist_to_goal, self.next_hop = gn, dist, nxt
+        self._path, self._off_route = None, 0
         reach = np.isfinite(dist).sum()
         print(f"[graphnav] goal -> node {gn} (ep{self.episode[gn]} ck{self.chunk_idx[gn]}, "
               f"d_loc={gd:.3f}); {reach}/{self.N} nodes can route to it")
@@ -144,10 +152,23 @@ class GraphNav:
         """-> (node_id, frame_rgb, info) or (None, None, info) = ENDGAME (use the real goal image).
         info: src node, d_loc, graph dist-to-goal, hops_left, waypoint d_live."""
         assert self.goal_node is not None, "set_goal first"
-        lookahead = lookahead or 2.0 * self.tau   # ~6 chunks/waypoint; CEM replans pull it closer each cycle
+        lookahead = lookahead or 2.0 * self.tau   # ~4 chunks/waypoint (gradient-basin calibration)
         d_all = self.dists_to_all(live_lat)
-        s = int(np.argmin(d_all))
-        info = {"src": s, "d_loc": float(d_all[s]),
+        g = int(np.argmin(d_all))
+        s, mode = g, "global"
+        if self._path is not None:                # sticky: localize onto the committed route
+            window = self._path[: self.track_window]
+            b = min(window, key=lambda n: d_all[n])
+            if np.isfinite(self.dist_to_goal[g]) and d_all[g] < d_all[b] - self.loc_margin:
+                self._off_route += 1              # global match clearly elsewhere — count, don't jump
+            else:
+                self._off_route = 0
+            if self._off_route >= self.reroute_patience:
+                s, mode, self._off_route = g, "reroute", 0
+            else:
+                s, mode = int(b), "tracked"
+        info = {"src": s, "d_loc": float(d_all[s]), "src_mode": mode,
+                "d_global": float(d_all[g]), "off_route": self._off_route,
                 "graph_dist": float(self.dist_to_goal[s]),
                 "src_ep": int(self.episode[s]), "src_ck": int(self.chunk_idx[s])}
         if not np.isfinite(self.dist_to_goal[s]):
@@ -156,6 +177,7 @@ class GraphNav:
         path = [s]
         while path[-1] != self.goal_node:
             path.append(int(self.next_hop[path[-1]]))
+        self._path = path                         # commit (tracked src -> identical route suffix)
         info["hops_left"] = len(path) - 1
         info["path"] = path                  # full planned node sequence src..goal (viewer route strip)
         if len(path) <= 1 or self.dist_to_goal[s] < self.tau:

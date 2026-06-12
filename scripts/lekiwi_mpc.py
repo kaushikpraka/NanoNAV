@@ -583,6 +583,8 @@ def main():
             if ginfo["status"] == "WAYPOINT":
                 plan_goal = wp_frame
             print(f"  graph: {ginfo['status']}  src={ginfo['src']} (ep{ginfo['src_ep']} ck{ginfo['src_ck']}) "
+                  f"[{ginfo.get('src_mode', '?')}"
+                  + (f" off={ginfo['off_route']}" if ginfo.get("off_route") else "") + "] "
                   f"d_loc={ginfo['d_loc']:.3f}  graph_dist={ginfo['graph_dist']:.3f}  "
                   f"hops={ginfo.get('hops_left', '-')}"
                   + (f"  -> wp {ginfo['wp_path_idx']}/{ginfo['hops_left']} node {ginfo['wp']} "
