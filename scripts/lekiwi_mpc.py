@@ -464,9 +464,9 @@ def main():
                          "reach ahead (a REAL cached frame); the final hop falls back to the actual "
                          "--goal image, so endgame keeps the validated reach-thresh semantics.")
     ap.add_argument("--graph-lookahead", type=float, default=None,
-                    help="waypoint route-progress budget in calibrated token-cos units (default: the "
-                         "graph's tau = one CEM reach). Route progress, not live distance — immune to "
-                         "the ~+0.2 cross-session offset.")
+                    help="waypoint route-progress budget in calibrated token-cos units (default: "
+                         "2*tau ~= 6 chunks, halves the waypoint count vs one-CEM-reach spacing). "
+                         "Route progress, not live distance — immune to the ~+0.2 cross-session offset.")
     ap.add_argument("--token-decoder", default=None,
                     help="train_token_decoder.py checkpoint for imagined-rollout viz with semantic ckpts")
     ap.add_argument("--var-scale", type=float, default=1.0,

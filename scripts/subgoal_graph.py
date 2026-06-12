@@ -17,8 +17,10 @@ Key choices:
 - ONE Dijkstra from the GOAL node at set_goal() time, run over the REVERSED edges, giving
   every node its true forward-drivable dist-to-goal + a next-hop tree. Each replan is then
   just a k-NN localization + a tree walk: no per-step graph search.
-- The waypoint handed to CEM is the FURTHEST tree node within --lookahead of ROUTE
-  PROGRESS (graph_dist[src] - graph_dist[node] < lookahead, default tau = one CEM reach).
+- The waypoint handed to CEM is the FURTHEST tree node within --lookahead of RAW ROUTE
+  PROGRESS (cumulative unpenalized edge weight along the path; soft-weld penalties are
+  routing costs, not physical distance). Default 2*tau ~= 4 chunks of spacing — the offline
+  gradient-basin calibration's ~90% one-step-descent point (2026-06-12).
   Route progress is measured in within-session calibrated units, so the ~+0.2 cross-session
   offset on live-frame distances (on-robot 2026-06-11 finding) cancels entirely; a
   live-distance lookahead would degenerate to 1-hop (~2 cm) crawling under that offset.
@@ -64,14 +66,20 @@ class GraphNav:
                                f"rebuild with scripts/build_subgoal_graph.py (direction-certified welds)")
         self.adj = defaultdict(list)      # DIRECTED u->[(v,w)]: hops the robot can drive
         self.radj = defaultdict(list)     # reversed, for the goal-rooted Dijkstra
+        self.w_raw = {}                   # (u,v) -> UNPENALIZED token-cos weight: real route
+                                          # progress for the lookahead budget (Dijkstra keeps
+                                          # the penalized weight so routing still avoids soft welds)
+        soft_pen = float(g["soft_penalty"]) if "soft_penalty" in g else 0.0
         for i, j, w in g["t_edges"]:      # temporal: FORWARD ONLY (no reverse on the base)
             i, j, w = int(i), int(j), max(float(w), 1e-6)
             self.adj[i].append((j, w))
             self.radj[j].append((i, w))
-        for i, j, w in g["s_edges"]:      # welds: direction-certified rows (ident = two rows;
-            i, j, w = int(i), int(j), max(float(w), 1e-6)   # soft already carries its penalty)
+            self.w_raw[(i, j)] = w
+        for (i, j, w), grade in zip(g["s_edges"], g["s_grade"]):  # direction-certified welds
+            i, j, w = int(i), int(j), max(float(w), 1e-6)         # (soft carries its penalty)
             self.adj[i].append((j, w))
             self.radj[j].append((i, w))
+            self.w_raw[(i, j)] = max(w - soft_pen, 1e-6) if grade == "soft" else w
         lats = np.load(Path(self.cache_dir) / "latents.npy")            # [N,C,h,w]
         self.C = int(lats.shape[1])
         t = torch.from_numpy(np.ascontiguousarray(lats)).to(device, torch.float32)
@@ -136,7 +144,7 @@ class GraphNav:
         """-> (node_id, frame_rgb, info) or (None, None, info) = ENDGAME (use the real goal image).
         info: src node, d_loc, graph dist-to-goal, hops_left, waypoint d_live."""
         assert self.goal_node is not None, "set_goal first"
-        lookahead = lookahead or self.tau
+        lookahead = lookahead or 2.0 * self.tau   # ~6 chunks/waypoint; CEM replans pull it closer each cycle
         d_all = self.dists_to_all(live_lat)
         s = int(np.argmin(d_all))
         info = {"src": s, "d_loc": float(d_all[s]),
@@ -154,10 +162,12 @@ class GraphNav:
             info["status"] = "ENDGAME"
             return None, None, info
         wp = path[1]
-        for n in path[2:]:                # furthest path node ~one CEM reach of ROUTE PROGRESS ahead
-            if n == self.goal_node:
-                break                     # the goal node itself -> endgame next localize
-            if self.dist_to_goal[s] - self.dist_to_goal[n] < lookahead:
+        progress = self.w_raw.get((path[0], path[1]), 0.0)
+        for m, n in enumerate(path[2:], start=2):   # furthest path node within the lookahead of
+            if n == self.goal_node:                 # RAW route progress (soft-weld penalties are
+                break                               # routing costs, not physical distance)
+            progress += self.w_raw.get((path[m - 1], n), 0.0)
+            if progress < lookahead:
                 wp = n
             else:
                 break
