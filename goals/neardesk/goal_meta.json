@@ -1,0 +1,13 @@
+{
+  "ip": "10.0.0.125",
+  "id": "lekiwi",
+  "shape": [
+    480,
+    640,
+    3
+  ],
+  "dtype": "uint8",
+  "preview_size": 256,
+  "drive_chunks": null,
+  "utc": "2026-06-12T01:43:47+00:00"
+}
