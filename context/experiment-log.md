@@ -1373,3 +1373,49 @@ direction (operator): write up as website + LinkedIn post from current data; ful
 recollect is the published next chapter, NOT a blocker. Inference-speedup plan (7.3 s→~1 s:
 bf16+flash → compile/CUDA-graphs → CEM warm-start → DDIM/pyramid; TRT assessed not-worth-it for
 the WM, DINO-TRT only if MPC goes continuous) saved in the plan file for later.**
+
+---
+
+## 2026-06-13 — Write-up scaffold + nearhamper graph attempts + recordings published
+
+**Website scaffold (4ba686c).** Started the project write-up as a hand-rolled static site under
+`docs/` for GitHub Pages (decision: long-form technical blog post, distill-style). `docs/index.html`
+= masthead + hero-video slot (YouTube embed placeholder for phone footage, to be filmed) + written
+TL;DR + 15-section build-log outline (problem → data → WM → run-001 failure → signal debugging →
+run-002 → CEM → hardware → flat-landscape failure → first arrival → semantic pivot → on-robot
+semantic → subgoal graph → the three fixes + REACHED → limitations/part-2); each unwritten section
+carries a `draft` note with its beat + numbers + which figure. `docs/style.css` = serif/44rem
+distill styling. `scripts/build_site_assets.py` = manifest-driven copy+downsize of 14 figures/videos
+into `docs/assets/` (3.9 MB; PIL, no ImageMagick/ffmpeg needed). **Prose is the remaining work** —
+sections are scaffolded, not written. To preview: `cd docs && python3 -m http.server 8000`. To
+deploy: repo Settings → Pages → `main`/`docs`.
+
+**nearhamper graph runs (no success).** Several `--graph` attempts at nearhamper1 across the day.
+The run that progressed: step 1 dist 0.47 / graph_dist 7.14 / 52 hops → step 62 dist 0.48 /
+graph_dist 6.12 / 40 hops (`[tracked]`, real route progress) → but by step 108 it had **regressed**
+to graph_dist 7.20 / 48 hops, dist hovering ~0.5; stopped without reaching
+(`mpc_semantic_graph_nearhamper3.rrd`, 423 MB; an earlier interrupted attempt =
+`mpc_semantic_graph_nearhamper2.rrd`, 417 MB). nearhamper from start-dist ~0.45 remains the hard
+case (outside the live CEM basin edge of 0.35–0.45) — it's the **strongest A/B story** for the
+write-up precisely because the no-graph baseline provably fails here, but the graph run still needs
+to land it. The 5-hop sparse-subgoal + subgoal-strip-viewer config (a773ef7/addce3e) got its first
+robot exposure here but no clean reach yet.
+
+**Ops — host blocker recurred AGAIN.** Same `DeviceNotConnectedError` at `robot.connect()`: engine
++ graph load fine (goal → node, 4384/4500 routable) but the LeKiwi client times out waiting for the
+Pi host. The `connection_time_s` dataclass edit still hasn't stuck on the host's actual venv —
+**verify before every session** with the host's python:
+`<host-python> -c "from lerobot.robots.lekiwi.config_lekiwi import LeKiwiHostConfig; print(LeKiwiHostConfig().connection_time_s)"`
+must print 86400. After a manual host restart one relaunch did connect and ran ~18 min before being
+stopped.
+
+**Run-launch style (memory).** Built then reverted a `run_mpc.sh` preset launcher
+(bba7e0c→2b415d1): operator prefers **plain foreground python one-liners**, no wrapper scripts, no
+nohup/log piping. Three canonical commands (semantic-graph / semantic-nograph / sdvae) recorded;
+only `--goal` and `--rerun-save` change per run.
+
+**Recordings published off-machine.** `.rrd` files can't go in git (up to 565 MB each, 5.6 GB total,
+over GitHub's 100 MB/file limit; LFS free tier is 1 GB). Curated **keepers** (successes + A/B demo
+material, ~2.1 GB / 8 files) uploaded as **GitHub Release `recordings-v1`**:
+https://github.com/KaushikTheProgrammer/NanoNAV/releases/tag/recordings-v1 — index +
+what-each-shows in [[RECORDINGS]]. Full set stays on `/workspace/results` (survives a pod stop).

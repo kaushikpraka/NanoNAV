@@ -56,3 +56,5 @@ Progress, experiments, and decisions are tracked in **git** (this repo), not Obs
 - [[tailscale-setup]] — Pod↔LeKiwi bridge for closed-loop 6b.3 (SSH reverse tunnel [recommended], Tailscale paths, TUN blocker)
 - [[runpod-operator-guide]] — Runbook for the pod-side agent that babysits training
 - [[training-runs]] — Per-run training telemetry log
+- [[RECORDINGS]] — On-robot Rerun (.rrd) recordings index + GitHub Release link (not in git)
+- `docs/` — long-form write-up (GitHub Pages); build figures with `scripts/build_site_assets.py`
