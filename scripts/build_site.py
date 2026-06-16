@@ -36,14 +36,13 @@ MD = os.path.join(ROOT, "writeup", "website_draft.md")
 OUT = os.path.join(ROOT, "docs", "index.html")
 ASSETS_DIR = os.path.join(ROOT, "docs", "assets")
 
-# section number -> id used in <h2 id> and #anchors (matches the original page)
-SLUGS = {
-    1: "problem", 2: "robot-data", 3: "world-model", 4: "run001", 5: "signal",
-    6: "run002", 7: "planning", 8: "hardware", 9: "first-loop", 10: "semantic",
-    11: "graph", 12: "graph-failures", 13: "limitations",
-}
-
 MEDIA_RE = re.compile(r"[\w./-]+\.(?:png|jpe?g|gif|svg|mp4|webm)", re.I)
+
+
+def slugify(s):
+    """Stable #anchor id from a section title."""
+    s = re.sub(r"<[^>]+>", "", s).lower()
+    return re.sub(r"[^a-z0-9]+", "-", s).strip("-")
 
 HEAD = """<!DOCTYPE html>
 <html lang="en">
@@ -304,12 +303,10 @@ def build():
         elif head.lower().startswith("background"):
             background = (head, body)
         else:
-            m = re.match(r"(\d+)\s*·\s*(.+)$", head)
-            if m:
-                n = int(m.group(1))
-                numbered.append((n, m.group(2).strip(), SLUGS.get(n, "sec%d" % n), body))
-
-    numbered.sort(key=lambda x: x[0])
+            # strip any literal "N · " — sections are auto-numbered by position,
+            # so splitting/reordering never requires manual renumbering
+            title = re.sub(r"^\d+\s*·\s*", "", head).strip()
+            numbered.append((title, body))
 
     # masthead
     masthead = (
@@ -328,8 +325,8 @@ def build():
     if background:
         toc.append('  <p class="toc-intro"><a href="#background">%s</a></p>' % background[0])
     toc.append("  <ol>")
-    for n, ttl, slug, _ in numbered:
-        toc.append('    <li><a href="#%s">%s</a></li>' % (slug, ttl))
+    for ttl, _ in numbered:
+        toc.append('    <li><a href="#%s">%s</a></li>' % (slugify(ttl), ttl))
     toc.append("  </ol>")
     toc.append("</nav>")
     toc_html = "\n".join(toc)
@@ -340,8 +337,8 @@ def build():
         art.append('<h2 id="background">%s</h2>\n' % background[0])
         art.append(render_body(background[1], False))
         art.append("")
-    for idx, (n, ttl, slug, body) in enumerate(numbered):
-        art.append('<h2 id="%s">%d · %s</h2>\n' % (slug, n, ttl))
+    for idx, (ttl, body) in enumerate(numbered):
+        art.append('<h2 id="%s">%d · %s</h2>\n' % (slugify(ttl), idx + 1, ttl))
         art.append(render_body(body, is_last_section=(idx == len(numbered) - 1)))
         art.append("")
     art.append("</article>")

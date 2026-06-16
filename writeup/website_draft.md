@@ -46,7 +46,7 @@ I was inspired by [**Nano World Models**](https://arxiv.org/abs/2605.23993) (Hua
 The Nano World Models project evaluates across three domains: simple control environments, game simulation, and **real-robot data (RT-1)**. If the recipe held on real robot data at that scale, it might hold on *mine*. And I had the robot: a **LeKiwi** left over from earlier imitation-learning work. So the plan was simple: collect my own data, train a nano-scale world model on it, and see if I could plan with it on the real machine.
 ---
 
-## 1 · The problem and the bet
+## 1 · The Problem Statement
 
 The classical way to make a robot go somewhere is a stack: build a map (SLAM), localize yourself in it, plan a path, follow the path. It works, and it is heavy — it wants depth sensors, careful calibration, and a metric model of the world maintained over time.
 
@@ -56,7 +56,7 @@ The bet here is that a world model trained on raw experience can replace that en
 
 ---
 
-## 2 · The robot and the data
+## 2 · Robot Hardware
 
 The **LeKiwi** is an open-source mobile manipulator from the LeRobot ecosystem: a low-cost SO-ARM-style arm bolted onto a **three-omniwheel "kiwi drive" base**, driven by an onboard **Raspberry Pi** and a handful of inexpensive serial-bus servos. For navigation I use only the base; the arm stays parked in a fixed pose throughout. The stock LeKiwi looks out from a low front-facing webcam; I swapped in wider-angle USB cameras. I also added a **third overhead spatial camera on a custom mount that looks down over the robot from above at roughly a 55° tilt**. That overhead vantage captures four depth zones at once: the robot's own body, the near floor, mid-room objects, and the far walls.
 
@@ -65,7 +65,7 @@ The **LeKiwi** is an open-source mobile manipulator from the LeRobot ecosystem: 
 [FIGURE: 🆕 assets/lekiwi-mount.jpg — photo of the LeKiwi with the custom overhead camera mount]
 *The rig. The LeKiwi base with the arm parked and the custom mount holding the overhead camera that everything downstream depends on. [TODO: drop the photo at docs/assets/lekiwi-mount.jpg.]*
 
-### Collecting the data
+## 3 · Data
 
 The dataset collection is fully manual teleop. The recording side is just **LeRobot's `record` pipeline**, which timestamps and synchronizes the overhead camera with the commanded base velocity at 30 Hz. For teleoperation, I configured a PS5 DualSense controller plugged in over USB and mapped through LeRobot's teleop interface. The left stick was for forward velocity and right stick for yaw rate, with no strafe binding so sideways velocity is zero by construction. The entire data-collection setup is a game controller and a laptop. The dataset is hosted on huggingface here: kaushikpraka/wm-smallarea_merged. You can visualize it at https://huggingface.co/spaces/lerobot/visualize_dataset.
 
@@ -76,26 +76,30 @@ The dataset is **50 teleoperated episodes, 44,926 frames at 30 Hz** of deliberat
 
 ### The action space: dead reckoning
 
-The robot is controlled with two floats: forward velocity and yaw rate. But I don't hand those to the model directly. Instead I **dead-reckon**: integrate each short window of about five control steps (~167 ms) into a single body-frame pose change, a displacement **(Δx, Δθ)** chunk.
+The robot is controlled with two floats: forward velocity and yaw rate. But I don't hand those to the model directly. Instead I **dead-reckon**: integrate each short window of about five control steps (~167 ms) into a single body-frame pose change, a displacement **(Δx, Δθ)** chunk. Some advantages of this representation:
 
-It's a **body-frame** displacement, so "drive forward 5 cm" is the same vector `(0.05, 0)` no matter which way the robot is facing, providing the model with heading invariance instead of having to learn it. It's **low-dimensional**, keeping planner's search small. it's an **integrated displacement, not a raw velocity**. During steady cruising the velocity is constant for many frames while the image keeps changing, so a model trained on velocities learns the action is uninformative and quietly stops listening to it. A displacement is nonzero exactly when the robot moves and scales with how far, so it stays coupled to what the camera sees.
+- It's a **body-frame** displacement, so "drive forward 5 cm" is the same vector `(0.05, 0)` no matter which way the robot is facing, providing the model with heading invariance instead of having to learn it.
+- It's **low-dimensional**, keeping planner's search small.
+- It's an **integrated displacement, not a raw velocity**.
 
-Dead reckoning has one assumption baked in — **no significant slip**, that a commanded centimeter is a real centimeter across the floor. For a light, slow robot on flat carpet that holds well enough, and because the planner re-observes a fresh frame every chunk, any small error is corrected rather than accumulated. The rest I checked empirically: the dropped Δy never exceeds ~0.58 mm, and an open-loop replay on the real robot traced the dead-reckoned path to ~0 cm even through a 117° arc. What none of this proves is that the model actually *learns to use* the action, that's the next three sections, and it's the difference between a well-designed action space and a working one.
+During steady cruising the velocity is constant for many frames while the image keeps changing, so a model trained on velocities learns the action is uninformative and quietly stops listening to it. A displacement is nonzero exactly when the robot moves and scales with how far, so it stays coupled to what the camera sees.
+
+Dead reckoning has one assumption baked in: **no significant slip**, that a commanded centimeter is a real centimeter across the floor. For a light, slow robot on flat carpet that holds well enough. Since the planner re-observes a fresh frame every chunk, any small error is corrected rather than accumulated. The rest I checked empirically: the dropped Δy never exceeds ~0.58 mm, and an open-loop replay on the real robot traced the dead-reckoned path to ~0 cm even through a 117° arc.
 
 [FIGURE: ✅ assets/chunk_deltas.png]
 *The action distribution per chunk, dead-reckoned from the raw logs. Forward motion is nearly bang-bang — stopped or full speed — and the per-chunk reach is short (~1.65 cm). The lateral drift Δy that I drop sits in the sub-millimeter range.*
 
 ---
 
-## 3 · A world model that imagines driving
+## 3 · The World Model
 
-The world model I used is **NanoWM**, a ~160M-parameter diffusion-forcing transformer. It does not work in pixels directly; it works in a compressed *latent* space (initially a frozen Stable-Diffusion VAE). Given a few context frames and a candidate action chunk, it predicts the latent of the future frame. Stack those predictions and you get a *rollout*: a short imagined video of what driving that way would look like.
+The world model I used is **NanoWM**, a ~160M-parameter diffusion-forcing transformer. It does not work in pixels directly, but instead in a compressed *latent* space (initially a frozen Stable-Diffusion VAE). Given a few context frames and a candidate action chunk, it predicts the latent of the future frame. Stack those predictions and you get a *rollout*: a short imagined sequence of what latent driving would look like.
 
-One knob matters more than it looks: the **frame interval**, the temporal stride between the frames the model is trained to connect. Too short and each step barely moves the scene, so the action signal is swamped by noise; too long and the prediction gets hard. This knob comes back in the next two sections as the thing that decides whether the model can feel its own actions at all.
+One critical nob is the **frame interval**, the temporal stride between the frames the model is trained to connect. Too short and each step barely moves the scene, so the action signal is swamped by noise; too long and the prediction gets hard. I experiment with this parameter in later sections
 
-The architecture choice worth stating plainly: the perception backbone (the VAE) is **frozen and pretrained**; the 160M transformer is trained **from scratch** on my 50 episodes. So this is a scene-specific dynamics model riding on a general perceptual backbone — it learns the physics of *this* room, and generalizes to new trajectories and goals within it, not across environments.
+The architecture choice worth stating plainly: the perception backbone (the VAE) is **frozen and pretrained**; the 160M transformer is trained **from scratch** on my 50 episodes. So this is a scene-specific latent dynamics model riding on a general perceptual backbone — it learns the physics of *this* room, and generalizes to new trajectories and goals within it, not across environments.
 
-Training itself is ordinary diffusion with one wrinkle. The transformer learns to **denoise the next frame's latent** given the recent frames and the action chunk — a **v-prediction** objective on a cosine, zero-terminal-SNR schedule — trained *diffusion-forcing* style, with an independent noise level per frame, which is what lets one network roll itself out autoregressively at inference. The action enters through a small **additive embedding** — a detail that comes back to matter. The rest is unremarkable: AdamW at 1e-4, effective batch 64, bf16, and about **12,000 steps — roughly 20 passes over the 50 episodes — on a single rented H100**, an overnight run rather than a multi-day one. That short wall-clock is the point: the recipe is cheap enough to iterate on, which is exactly what the next several sections do, repeatedly.
+Training uses **diffusion forcing**. Rather than corrupting every frame to a single shared noise level (ordinary video diffusion), each frame is denoised at its own independent noise level; with causal masking, that's what lets one network roll itself out autoregressively at inference — predict a frame, treat it as clean context, predict the next — which is exactly the loop CEM drives. (It's also why validation loss turns out to be a poor guide to rollout quality, as a later section shows.) Concretely, the transformer learns to **denoise the next frame's latent** given the recent frames and the action chunk, a **v-prediction** objective on a cosine, zero-terminal-SNR schedule. The action enters through a small **additive embedding** — a detail that comes back to matter. The rest is unremarkable: AdamW at 1e-4, effective batch 64, bf16, and about **12,000 steps — roughly 20 passes over the 50 episodes — on a single rented H100**, an overnight run rather than a multi-day one. That short wall-clock is the point: the recipe is cheap enough to iterate on, which is exactly what the next several sections do, repeatedly.
 
 **"But won't 160M parameters on 50 episodes just overfit?"** Yes — in the textbook sense, and fast; the first training run was overfitting within a few epochs. But overfitting turns out to be the wrong thing to worry about here, for three reasons. First, specializing hard to *this one room* is the goal, not the failure mode: the frozen backbone carries the cross-scene generalization, so the part I train from scratch only has to learn one room's dynamics — a far smaller job than learning to see and predict at once. Second, the metric that screams "overfit" — the denoising validation loss — is the wrong dial to watch: the quality that actually matters for planning keeps *improving* well past the point val-loss bottoms out and turns up (the U-shaped curve in the next section). Naively early-stopping on val-loss would have handed me a *worse* planner. And third, the real tax of tiny data didn't show up as classic memorization at all — it showed up as **coverage**: the model is crisp where I drove and blurry-to-hallucinatory where I didn't. The fix for that is more of the room on tape, not more regularization — and it's exactly the failure that surfaces a few sections from now.
 
