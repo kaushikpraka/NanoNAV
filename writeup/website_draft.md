@@ -58,7 +58,7 @@ The bet here is that a world model trained on raw experience can replace that en
 
 ## 2 · Robot Hardware
 
-The **LeKiwi** is an open-source mobile manipulator from the LeRobot ecosystem: a low-cost SO-ARM-style arm bolted onto a **three-omniwheel "kiwi drive" base**, driven by an onboard **Raspberry Pi** and a handful of inexpensive serial-bus servos. For navigation I use only the base; the arm stays parked in a fixed pose throughout. The stock LeKiwi looks out from a low front-facing webcam; I swapped in wider-angle USB cameras. I also added a **third overhead spatial camera on a custom mount that looks down over the robot from above at roughly a 55° tilt**. That overhead vantage captures four depth zones at once: the robot's own body, the near floor, mid-room objects, and the far walls.
+The **LeKiwi** is an open-source mobile manipulator from the LeRobot ecosystem: a low-cost SO-ARM-style arm bolted onto a **three-omniwheel "kiwi drive" base**, driven by an onboard **Raspberry Pi** and a handful of inexpensive serial-bus servos. (The Pi does no heavy lifting — it just streams camera frames and accepts velocity commands; the world model itself runs on a rented cloud GPU bridged to the robot over a tunnel, which we'll get to when we go closed-loop.) For navigation I use only the base; the arm stays parked in a fixed pose throughout. The stock LeKiwi looks out from a low front-facing webcam; I swapped in wider-angle USB cameras. I also added a **third overhead spatial camera on a custom mount that looks down over the robot from above at roughly a 55° tilt**. That overhead vantage captures four depth zones at once: the robot's own body, the near floor, mid-room objects, and the far walls.
 
 *Hardware at a glance: LeKiwi (LeRobot) · holonomic 3-omniwheel base · SO-ARM arm, parked · Raspberry Pi host · low-cost serial-bus servos · overhead USB camera on a custom ~55° mount. [TODO: confirm exact Pi model / servo model / camera model and how the mount was fabricated.]*
 
@@ -110,25 +110,25 @@ Training uses [**Diffusion Forcing**](https://arxiv.org/abs/2407.01392) (Chen et
 
 ## 5 · The long road to a working planner
 
-Everything up to here was setup. What follows is the build log proper — each attempt, each wrong diagnosis, and what it taught, in the order it happened. The failures aren't asides; they're the spine of the story.
+Everything up to here was setup. In this section, I cover the proper build log including each attempt, each wrong diagnosis, and what it taught, in the order it happened. I want to be open on the failures I had that all eventually led to success.
 
 ### Run 001: dead on arrival
 
-The first trained model failed the most basic test you can give a world model. The test: roll it out three ways — with **zero** action, with the **true** action, with a **random** action — and check that the true-action future is closest to what really happened. If the model uses actions, true beats zero beats random.
+The first trained model failed the most basic test you can give a world model. The test: roll it out three ways: with **zero** action, with the **true** action, with a **random** action. The true-action future is closest to what really happened. If the model uses actions, true beats zero beats random.
 
-Run 001 predicted nearly the same future no matter what I told it the robot did. The action-embedding signal measured **0.0088 RMS** — essentially noise — and zero-action and random-action rollouts were indistinguishable. A world model that ignores actions is a screensaver.
+Run 001 predicted nearly the same future no matter what I told it the robot did. The action-embedding signal measured **0.0088 RMS** and zero-action and random-action rollouts were indistinguishable.
 
-This is the start of the real story, because my first explanation for *why* the actions were dead turned out to be wrong — twice over.
+This is the start of the real story, because my first explanation for *why* the actions were dead turned out to be wrong.... twice.
 
 ---
 
 ### Is translation even visible? Debugging the signal
 
-The first hypothesis was that the **frame interval was too short** — that each step moved the scene so little the action's effect drowned in noise. I could test that without retraining anything, directly in the recorded frames: encode them, and measure how much the latent *changes* across a chunk as a function of the action, at several frame intervals. If forward motion barely registers in the frames themselves, no world model could be expected to learn it. The first cut looked damning: **rotation** correlated strongly with latent change (~0.64–0.70), but **translation** correlated at ~0.00 — and at every frame interval. The conclusion I almost wrote down was the expensive one — *this overhead camera geometrically cannot see forward motion* — which would have meant changing the hardware.
+My first hypothesis was that the **frame interval was too short**, that each step moved the scene so little the action's effect drowned in noise. I could test that without retraining anything, directly in the recorded frames: encode them, and measure how much the latent *changes* across a chunk as a function of the action, at several frame intervals. If forward motion barely registers in the frames themselves, no world model could be expected to learn it. The initial results were bleak. At every frame interval, **rotation** correlated strongly with latent change (~0.64–0.70), but **translation** correlated at ~0.00. This nearly led me to conclude that this camera mount was the wrong choice, which would have meant changing the hardware.
 
-It was wrong, and instructively so: correlation was the wrong estimator. Forward speed is nearly bang-bang — the robot is either stopped or at full speed — so there's almost no spread in "how much translation" for a correlation to latch onto; and the large latent swings from pure rotation drag the pooled number toward zero. A flat correlation didn't mean no signal; it meant the wrong test.
+It was wrong, and instructively so: correlation was the wrong estimator. Forward speed is nearly bang-bang, meaning the robot is either stopped or at full speed, so there's almost no spread in "how much translation" for a correlation to latch onto; and the large latent swings from pure rotation drag the pooled number toward zero. A flat correlation didn't mean no signal; it meant the wrong test.
 
-The fix was a **controlled contrast**: hold rotation near zero and directly compare the latent change of *stationary* chunks against *pure-translation* chunks. Now translation separated cleanly — **AUC 0.94–0.98**, meaning a forward-driving chunk out-changes a standing-still chunk 94–98% of the time — and on the *same frame-interval axis* where the correlation had been flat, detectability climbed monotonically as I widened the interval (a dose-response a scene confound can't fake). The signal was in the frames all along; what Run 001 lacked was a frame interval wide enough for it to clear the noise — exactly the knob the retrain would turn next.
+The fix was a **controlled contrast**: hold rotation near zero and directly compare the latent change of *stationary* chunks against *pure-translation* chunks. The translation was now clear **AUC 0.94–0.98**, meaning a forward-driving chunk out-changes a standing-still chunk 94–98% of the time. The signal was in the frames all along; what Run 001 lacked was a frame interval wide enough for it to clear the noise. 
 
 *Lesson: a pooled correlation can bury a perfectly detectable signal. Design the controlled test first.*
 
@@ -144,8 +144,6 @@ The fix was a **controlled contrast**: hold rotation near zero and directly comp
 
 Retrained at a longer frame interval (f=10), to completion, with best-checkpoint saving. The action branch came alive: a clean, widening **true < zero < random** separation (random now distinctly worse than zero — the model uses the action's *content*, not just its presence), and decoded rollouts that visibly track real translation, rotation, and arcs in the right direction.
 
-Picking *which* checkpoint to deploy taught the next lesson. For a diffusion-forcing model, **validation loss is a bad proxy for rollout quality.** The denoising val-loss bottomed at step 4,125 — but when I actually graded rollouts across checkpoints, quality was **U-shaped in training step**: it kept improving *past* the val-best, peaked around step 6–8K, then overfitting degraded it through 12K. Val-loss had mis-ranked the checkpoints. I carried **step-8000** — judged by rollouts, the thing the model is actually for.
-
 [FIGURE: ✅ assets/action_diagnostic.png]
 *The action test, passed. True-action rollouts (closest to ground truth) clearly beat zero- and random-action — the model now responds to what it's told the robot did.*
 
@@ -154,7 +152,7 @@ Picking *which* checkpoint to deploy taught the next lesson. For a diffusion-for
 
 ---
 
-### Planning by imagination: CEM in latent space
+### Planning by Imagination: CEM in Latent Space
 
 With a model that responds to actions, planning is a search. The loop, run as stop-and-plan MPC:
 
@@ -162,33 +160,14 @@ With a model that responds to actions, planning is a search. The loop, run as st
 2. Sample a batch of candidate action sequences.
 3. Roll each one out in the world model; encode the goal image once.
 4. Score each imagined endpoint by its distance to the goal in latent space.
-5. Keep the best, resample around them, repeat a few times (this is **CEM** — the cross-entropy method).
+5. Keep the best, resample around them, repeat a few times (this is **CEM**: the cross-entropy method).
 6. Execute only the *first* chunk of the winning plan, then replan from the new observation.
-
-Offline — graded against held-out data where I know the answer — this passed every gate. CEM **beats the do-nothing baseline 100%** of the time, lands **near the world model's own ceiling** (it can't do better than the model's prediction error, and it nearly saturates it in every motion category), and **recovers the true commands** (correct turn/forward sign 100% of the time, ~1 cm and ~2.5° error). And the cheap sampler held: dropping to just 3 denoising steps didn't hurt goal-reaching, which is what makes a ~7-second replan viable on real hardware.
-
-**This is the part to remember: the planner was validated early, and it was never the thing that broke.** Every failure that follows is about the *score* in step 4, not the search.
-
-[FIGURE: 🆕 system/loop diagram — observe → imagine → score → act (hand-authored SVG)]
-*The planning loop. [TODO: make this diagram.]*
-
-| Offline planner gate (step-8000, 35 held-out scenes) | Result |
-|---|---|
-| Beats the do-nothing (no-move) floor | 100% of scenes |
-| Reached / world-model ceiling (`cem_reached / gt_ceiling`) | ~1.0–1.1, every motion bucket |
-| Turn / forward sign recovered | 100% |
-| Translation error · heading error | ~1 cm · ~2.5° |
-| Replan time at DDIM=3 (no pivot collapse) | ~7 s |
-
-> Graded against held-out data, stratified by motion (translation / pivot / arc / slow). CEM nearly saturates the model's own prediction ceiling in every bucket — the residual goal gap is world-model error, not planner failure.
 
 ---
 
 ### Touching reality: transport and open-loop replay
 
-The compute and the robot are nowhere near each other. The world model and the CEM planner run on a **rented H100 in a datacenter**; the robot is on the floor of my room. On the robot, a **Raspberry Pi runs LeRobot's LeKiwi host** — a small ZMQ server that streams the overhead camera frame (plus the base state) and accepts velocity commands. In the cloud, the same Python process that holds the world model runs the matching **LeKiwi client**, so "get an observation" and "send an action" are ordinary function calls that happen to cross the network. Because the Pi sits behind my home router, the two are bridged by an **SSH reverse tunnel**: the pod dials `127.0.0.1` on a forwarded port and the tunnel carries the ZMQ traffic back to the Pi. One closed-loop step is therefore: pull a frame over the tunnel → preprocess and encode it → CEM rolls the world model forward and picks the best first chunk → convert that `(Δx, Δθ)` back to a `(v, ω)` velocity → send it to the Pi, which drives the base for exactly one chunk (~0.33 s) → stop, re-observe, replan. The per-observation round-trip is a few tens of milliseconds — trivial next to the ~7-second planning step. It's stop-and-plan, not real-time control, which is the only reason a datacenter GPU can drive a robot in my room at all.
-
-Two bring-up notes earned their keep. Sign and unit conventions had to be pinned on the *real* robot (forward +x in m/s, CCW +yaw in deg/s, with a low-speed rotation deadband); and testing the robot **wheels-up** can't show body rotation at all — the omniwheels spin tangentially while the body sits fixed on the stand, so it *looked* like "no rotation at any command" until the motor readback proved otherwise. On the ground, an open-loop replay of recorded chunks matched dead-reckoning to ~0 cm even through a 117° arc, confirming the chunk approximation loses nothing.
+The planning loop above runs nowhere near the robot. The world model and the CEM planner live on a **rented H100** through Runpod; the robot is on the floor of my room. On the robot, a **Raspberry Pi runs LeRobot's LeKiwi host**, a small ZMQ server that streams the overhead camera frame and accepts velocity commands. In the cloud, the same Python process that holds the world model runs the matching **LeKiwi client**, so the planner's "observe" and "act" are ordinary function calls that happen to cross the network. An **SSH reverse tunnel** bridges the Pi to the cloud. The only timing that matters is the asymmetry: each plan drives the base for exactly one chunk (~0.33 s), then the robot stops and waits ~7 seconds for the next plan. This makes the so the few-tens-of-milliseconds network round-trip irrelevant. This is **stop-and-plan, not real-time control**, and it's the only reason a datacenter GPU can drive a robot in my room at all. In the future, I'd like to explore speeding up inference to enable more real-time capabilities.
 
 [FIGURE: ✅ assets/replay_filmstrip.png]
 *Open-loop replay on hardware. Commanded chunks reproduce the recorded path in shape, direction, and extent.*
