@@ -273,9 +273,9 @@ Without the graph, the flat planner succeeds from a start distance of 0.35 but w
 
 ## 6 · Limitations
 
-The scope is deliberately narrow: one corner of one room, a single overhead camera, goals drawn from the same space the robot drove through. Navigation is stop-and-plan — the robot pauses roughly 7 seconds between moves — and the graph covers exactly where the data was collected. These are tradeoffs, not accidents. The question this project set out to answer did not require more.
+The scope is deliberately narrow. One corner of one room, a single overhead camera, goals drawn from the same space the robot drove through. Navigation is stop-and-plan, meaning the robot pauses roughly 7 seconds between moves. The graph covers exactly where the data was collected. These are tradeoffs, not accidents. The question this project set out to answer did not require more.
 
-None of the algorithms are original. The graph is **teach-and-repeat**. Nodes are training frames, localization is nearest-neighbor lookup, and routes replay stitched segments of prior drives. Predicting frozen-DINO features is DINO-WM. The experience graph mirrors ViNG. The planner is textbook sampling MPC. That is all intentional. The goal was never to invent a new method. It was a systems integration challenge: take strong, established tools, put them together carefully, and show they work on real hardware from a small dataset. Making that work — measuring the failures, isolating the bottlenecks, and proving the fix — was the contribution.
+None of the algorithms are original. The graph is **teach-and-repeat**. Nodes are training frames, localization is nearest-neighbor lookup, and routes replay stitched segments of prior drives. Predicting frozen-DINO features is DINO-WM. The experience graph mirrors ViNG. The planner is textbook sampling MPC. That is all intentional. The goal was never to invent a new method. It was a systems integration challenge. The task was to take strong, established tools, put them together carefully, and show they work on real hardware from a small dataset. Measuring the failures, isolating the bottlenecks, and proving the fix was where all the work lived.
 
 ## 7 · What comes next
 
