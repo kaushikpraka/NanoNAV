@@ -51,7 +51,7 @@ HEAD = """<!DOCTYPE html>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>NanoNAV — real-robot navigation with Nano World Models</title>
 <meta name="description" content="Latent-space planning with a Nano World Model drives a LeKiwi robot to goal images — learned from 25 minutes of driving, no maps, no depth, no pose.">
-<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="style.css?v=%s">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
 </head>
 <body>
@@ -353,7 +353,8 @@ def build():
 
     footer = '<footer>\n  © 2026 Kaushik Prakash · written up June 2026\n</footer>\n'
 
-    html = HEAD + "\n" + masthead + "\n" + hero + "\n" + article + "\n\n" + footer + "\n" + SCRIPT
+    import time
+    html = (HEAD % int(time.time())) + "\n" + masthead + "\n" + hero + "\n" + article + "\n\n" + footer + "\n" + SCRIPT
     open(OUT, "w", encoding="utf-8").write(html)
     print("wrote %s (%d sections)" % (os.path.relpath(OUT, ROOT), len(numbered)))
 
