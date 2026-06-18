@@ -100,6 +100,30 @@ SCRIPT = """<script>
   window.addEventListener('resize', onScroll, { passive: true });
   update();
 })();
+
+// Theme toggle — cycles cream → gray → dark, persists via localStorage
+(function () {
+  var themes = ['cream', 'gray', 'dark'];
+  var saved = localStorage.getItem('nanovnav-theme') || 'cream';
+
+  function apply(theme) {
+    document.body.classList.remove('theme-gray', 'theme-dark');
+    if (theme === 'gray') document.body.classList.add('theme-gray');
+    if (theme === 'dark') document.body.classList.add('theme-dark');
+    btn.textContent = theme;
+    localStorage.setItem('nanovnav-theme', theme);
+    saved = theme;
+  }
+
+  var btn = document.createElement('button');
+  btn.id = 'theme-toggle';
+  btn.setAttribute('aria-label', 'Toggle colour theme');
+  btn.onclick = function () {
+    apply(themes[(themes.indexOf(saved) + 1) % themes.length]);
+  };
+  document.body.appendChild(btn);
+  apply(saved);
+})();
 </script>
 <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
 <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"
