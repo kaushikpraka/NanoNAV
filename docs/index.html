@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>NanoNAV — real-robot navigation with Nano World Models</title>
 <meta name="description" content="Latent-space planning with a Nano World Model drives a LeKiwi robot to goal images — learned from 25 minutes of driving, no maps, no depth, no pose.">
-<link rel="stylesheet" href="style.css?v=1781802591">
+<link rel="stylesheet" href="style.css?v=1781803051">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
 </head>
 <body>
@@ -51,13 +51,13 @@
 
 <p>I was inspired by <a href="https://arxiv.org/abs/2605.23993"><strong>Nano World Models</strong></a> (Huang et al., 2026), a minimalist, diffusion-forcing world-model codebase released recently. The authors remark that "the broader research community still lacks compact, reproducible, and easily extensible implementations" of modern world models and set out to change that. More than the code, that framing is what grabbed me. It was a call to <em>democratize</em> world-model research, to show the ideas don't require a frontier lab's compute or data to be worth building on. That resonated, and it set the constraint that defines everything here: do this small.</p>
 
-<p>The Nano World Models project evaluates across simple control environments, game simulation, and <strong>real-robot data (RT-1)</strong>. If the recipe held on real robot data at that scale, it might hold on <em>mine</em>. And I had the robot. A <a href="https://github.com/SIGRobotics-UIUC/LeKiwi"><strong>LeKiwi</strong></a> mobile manipulator left over from earlier imitation-learning work. So the plan was simple. Collect my own data, train a nano-scale world model on it, and see if I could plan with it on the real machine.</p>
+<p>The Nano World Models project evaluates across simple control environments, game simulation, and <strong>real-robot data (RT-1)</strong>. If the recipe held on real robot data at that scale, it might hold on <em>mine</em>. I had A <a href="https://github.com/SIGRobotics-UIUC/LeKiwi"><strong>LeKiwi</strong></a> mobile manipulator left over from earlier imitation-learning work. So the plan was simple. Collect my own data, train a nano-scale world model on it, and see if I could plan with it on real hardware.</p>
 
 <h2 id="the-problem-statement">1 · The Problem Statement</h2>
 
-<p>The classical way to make a robot go somewhere is a stack: build a map (SLAM), localize yourself in it, plan a path, follow the path. It works, and it is heavy — it wants depth sensors, careful calibration, and a metric model of the world maintained over time.</p>
+<p>The classical way to make a robot go somewhere is a pipeline where you build a map with SLAM, localize yourself in it, plan a path, and follow it. It works reliably, but it is heavy machinery, requiring depth sensors, careful calibration, and a persistent metric model of the world maintained over time.</p>
 
-<p>The bet here is that a world model trained on raw experience can replace that entire stack. The task is deliberately stark: the robot gets its <strong>current camera frame</strong> and a <strong>target image</strong>, and it outputs <strong>body-frame velocities</strong>. No pre-built map, no external localization or depth sensor, no GPS, no reward function, no task demonstrations. The goal is specified at <em>inference</em> time, by an image, and the model has never been told that goal exists.</p>
+<p>The bet here is that a world model trained on raw experience can replace all of that, so the task is kept deliberately stark. The robot receives its <strong>current camera frame</strong> and a <strong>target image</strong>, and outputs <strong>body-frame velocities</strong>, with no pre-built map, no external localization, no depth sensor, no reward function, and no task demonstrations. The goal arrives at inference time as a photograph, and the model has never been told that goal exists.</p>
 
 <h2 id="robot-hardware">2 · Robot Hardware</h2>
 

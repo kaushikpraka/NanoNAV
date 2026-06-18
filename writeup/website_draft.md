@@ -41,15 +41,15 @@ This project lives squarely in the **Planner** corner of that taxonomy. It is no
 
 I was inspired by [**Nano World Models**](https://arxiv.org/abs/2605.23993) (Huang et al., 2026), a minimalist, diffusion-forcing world-model codebase released recently. The authors remark that "the broader research community still lacks compact, reproducible, and easily extensible implementations" of modern world models and set out to change that. More than the code, that framing is what grabbed me. It was a call to *democratize* world-model research, to show the ideas don't require a frontier lab's compute or data to be worth building on. That resonated, and it set the constraint that defines everything here: do this small.
 
-The Nano World Models project evaluates across simple control environments, game simulation, and **real-robot data (RT-1)**. If the recipe held on real robot data at that scale, it might hold on *mine*. And I had the robot. A [**LeKiwi**](https://github.com/SIGRobotics-UIUC/LeKiwi) mobile manipulator left over from earlier imitation-learning work. So the plan was simple. Collect my own data, train a nano-scale world model on it, and see if I could plan with it on the real machine.
+The Nano World Models project evaluates across simple control environments, game simulation, and **real-robot data (RT-1)**. If the recipe held on real robot data at that scale, it might hold on *mine*. I had A [**LeKiwi**](https://github.com/SIGRobotics-UIUC/LeKiwi) mobile manipulator left over from earlier imitation-learning work. So the plan was simple. Collect my own data, train a nano-scale world model on it, and see if I could plan with it on real hardware.
 
 ---
 
 ## 1 · The Problem Statement
 
-The classical way to make a robot go somewhere is a stack: build a map (SLAM), localize yourself in it, plan a path, follow the path. It works, and it is heavy — it wants depth sensors, careful calibration, and a metric model of the world maintained over time.
+The classical way to make a robot go somewhere is a pipeline where you build a map with SLAM, localize yourself in it, plan a path, and follow it. It works reliably, but it is heavy machinery, requiring depth sensors, careful calibration, and a persistent metric model of the world maintained over time.
 
-The bet here is that a world model trained on raw experience can replace that entire stack. The task is deliberately stark: the robot gets its **current camera frame** and a **target image**, and it outputs **body-frame velocities**. No pre-built map, no external localization or depth sensor, no GPS, no reward function, no task demonstrations. The goal is specified at *inference* time, by an image, and the model has never been told that goal exists.
+The bet here is that a world model trained on raw experience can replace all of that, so the task is kept deliberately stark. The robot receives its **current camera frame** and a **target image**, and outputs **body-frame velocities**, with no pre-built map, no external localization, no depth sensor, no reward function, and no task demonstrations. The goal arrives at inference time as a photograph, and the model has never been told that goal exists.
 
 [TODO: optionally a one-line spec box here — camera, 2-D action (forward velocity + yaw rate), goal-as-photo.]
 
