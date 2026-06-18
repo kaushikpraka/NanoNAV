@@ -183,19 +183,23 @@
 
 <p>Far from the goal, the <strong>objective was blind</strong>. CEM had no gradient and every candidate action looked equidistant from the goal.</p>
 
-<p>To find out why, each candidate metric (SD-VAE, DINOv2, Pixel-L1) was measured at tape-marked positions across the room (10–60 cm out, ±60 cm lateral, ±30° yaw). Two things were tested for each: whether it correctly orders positions by distance at all (measured by ρ, the Spearman rank correlation. The intuition: forget the actual numbers and ask only "does the metric rank these positions in the right order?" A tape distance of 10 cm should score closer than 40 cm, regardless of whether the metric itself says 0.3 vs 0.8 or 120 vs 950. Spearman converts both sides to ranks before comparing, so metrics on completely different scales become comparable. ρ = 1.0 means perfect ordering; ρ = 0 means no agreement. We use rank correlation rather than a linear one because CEM only needs to know which direction is closer, not by exactly how much), and whether its gradient in the far band stays above the standing-still noise floor. A metric can score ρ = 1.00 globally and still be useless if the gradient per step is buried in noise.</p>
+<p>To find out why, three candidate metrics were measured at tape-marked positions across the room: 10–60 cm out along the approach axis and ±60 cm to either side. Each metric was graded on two requirements for CEM to work.</p>
+
+<p><strong>Requirement 1: global ordering.</strong> Does the metric rank positions in the correct order by distance? Measured by ρ, the Spearman rank correlation with ground-truth tape distance. ρ = 1.0 means every closer position scores closer than every farther one. This is the test most people run, and nearly everything passes it.</p>
+
+<p><strong>Requirement 2: far-field sensitivity.</strong> In the far band (30–60 cm out), is the per-step change large enough for CEM to detect progress above the robot's own standing-still jitter? Reported as a multiple of the noise floor: 1.0× means one step forward changes the metric by exactly the same amount as the robot's natural variation at rest. Below that, CEM cannot distinguish "I moved toward the goal" from "I am still." This is the test that matters for planning, and it is where the failure hides.</p>
 
 <figure>
   <img src="assets/sweep_diagram.png" alt="">
-  <figcaption><b>The measurement setup.</b> The robot was hand-placed at each grid position and a frame was captured. Orange poses are the near band (0–30 cm), blue are the far band where CEM needs to plan. At select positions, three yaw orientations were tested (±25°).</figcaption>
+  <figcaption><b>The measurement grid.</b> The robot was hand-placed at each position and a frame was captured. Orange poses are the near band (0–30 cm), blue are the far band where CEM needs to plan. Three yaw orientations were tested at select positions.</figcaption>
 </figure>
 
 <table>
-  <thead><tr><th>Metric</th><th>Global ordering (ρ)</th><th>Far-field gradient / noise (radial, lateral)</th><th>Verdict</th></tr></thead>
+  <thead><tr><th>Metric</th><th>Ordering (ρ)</th><th>Far-field signal / noise</th><th>Why it fails</th></tr></thead>
   <tbody>
-    <tr><td>Pixel L1</td><td>1.00</td><td>706×, 386×</td><td>fail (lateral ordering wrong)</td></tr>
-    <tr><td><strong>SD-VAE latent L2</strong></td><td>1.00</td><td><strong>1.25×, 0.80×</strong></td><td><strong>FAIL</strong> (gradient below noise floor)</td></tr>
-    <tr><td><strong>Frozen DINOv2 patch cosine</strong></td><td>0.94</td><td><strong>12×, 21×</strong></td><td><strong>PASS</strong></td></tr>
+    <tr><td>Pixel L1</td><td>1.00</td><td>706×, 386×</td><td>Strong signal, but lateral ordering breaks: the metric increases when moving sideways even when that sideways position is closer. CEM would overcorrect.</td></tr>
+    <tr><td><strong>SD-VAE latent L2</strong></td><td>1.00</td><td><strong>1.25×, 0.80×</strong></td><td>Perfect global ordering, but the far-field gradient is at or below the noise floor. CEM cannot see progress more than ~25 cm out.</td></tr>
+    <tr><td><strong>Frozen DINOv2 patch cosine</strong></td><td>0.94</td><td><strong>12×, 21×</strong></td><td>Passes both.</td></tr>
   </tbody>
 </table>
 

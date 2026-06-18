@@ -177,16 +177,20 @@ This meant that very close to a goal, the metric has a sharp basin and the robot
 
 Far from the goal, the **objective was blind**. CEM had no gradient and every candidate action looked equidistant from the goal.
 
-To find out why, each candidate metric (SD-VAE, DINOv2, Pixel-L1) was measured at tape-marked positions across the room (10–60 cm out, ±60 cm lateral, ±30° yaw). Two things were tested for each: whether it correctly orders positions by distance at all (measured by ρ, the Spearman rank correlation. The intuition: forget the actual numbers and ask only "does the metric rank these positions in the right order?" A tape distance of 10 cm should score closer than 40 cm, regardless of whether the metric itself says 0.3 vs 0.8 or 120 vs 950. Spearman converts both sides to ranks before comparing, so metrics on completely different scales become comparable. ρ = 1.0 means perfect ordering; ρ = 0 means no agreement. We use rank correlation rather than a linear one because CEM only needs to know which direction is closer, not by exactly how much), and whether its gradient in the far band stays above the standing-still noise floor. A metric can score ρ = 1.00 globally and still be useless if the gradient per step is buried in noise.
+To find out why, three candidate metrics were measured at tape-marked positions across the room: 10–60 cm out along the approach axis and ±60 cm to either side. Each metric was graded on two requirements for CEM to work.
+
+**Requirement 1: global ordering.** Does the metric rank positions in the correct order by distance? Measured by ρ, the Spearman rank correlation with ground-truth tape distance. ρ = 1.0 means every closer position scores closer than every farther one. This is the test most people run, and nearly everything passes it.
+
+**Requirement 2: far-field sensitivity.** In the far band (30–60 cm out), is the per-step change large enough for CEM to detect progress above the robot's own standing-still jitter? Reported as a multiple of the noise floor: 1.0× means one step forward changes the metric by exactly the same amount as the robot's natural variation at rest. Below that, CEM cannot distinguish "I moved toward the goal" from "I am still." This is the test that matters for planning, and it is where the failure hides.
 
 [FIGURE: ✅ assets/sweep_diagram.png]
-*The measurement setup. The robot was hand-placed at each grid position and a frame was captured. Orange poses are the near band (0–30 cm), blue are the far band where CEM needs to plan. At select positions, three yaw orientations were tested (±25°).*
+*The measurement grid. The robot was hand-placed at each position and a frame was captured. Orange poses are the near band (0–30 cm), blue are the far band where CEM needs to plan. Three yaw orientations were tested at select positions.*
 
-| Metric | Global ordering (ρ) | Far-field gradient / noise (radial, lateral) | Verdict |
+| Metric | Ordering (ρ) | Far-field signal / noise | Why it fails |
 |---|---|---|---|
-| Pixel L1 | 1.00 | 706×, 386× | fail (lateral ordering wrong) |
-| **SD-VAE latent L2** | 1.00 | **1.25×, 0.80×** | **FAIL** (gradient below noise floor) |
-| **Frozen DINOv2 patch cosine** | 0.94 | **12×, 21×** | **PASS** |
+| Pixel L1 | 1.00 | 706×, 386× | Strong signal, but lateral ordering breaks: the metric increases when moving sideways even when that sideways position is closer. CEM would overcorrect. |
+| **SD-VAE latent L2** | 1.00 | **1.25×, 0.80×** | Perfect global ordering, but the far-field gradient is at or below the noise floor. CEM cannot see progress more than ~25 cm out. |
+| **Frozen DINOv2 patch cosine** | 0.94 | **12×, 21×** | Passes both. |
 
 [FIGURE: ✅ assets/metric_comparison.png]
 *Both metrics use the same images. The VAE metric (left) plateaus after ~25 cm — in the far band, one step forward is indistinguishable from standing still, so CEM has nothing to minimize. DINOv2 cosine (right) maintains a clear gradient across the full range.*
