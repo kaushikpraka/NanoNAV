@@ -1,8 +1,9 @@
 """
 Generate a schematic figure comparing SD-VAE L2 vs. DINOv2 cosine distance.
 
-X-axis = displacement toward goal (cm). As the robot travels further,
-it gets closer to the goal, so the metric should DECREASE.
+X-axis = distance from goal (cm), reversed so far-from-goal is on the left
+and the robot approaches the goal toward the right. Metric should DECREASE
+as the robot gets closer (moves right).
 
 Key numbers from Gate A sweep (context/learned-distance-metric.md):
   SD-VAE L2:     far-band slope 1.25σ  (gradient buried in noise — curve stays flat)
@@ -30,7 +31,7 @@ def dino_true(r):
     # Linear throughout (far-band slope ≈ 12× noise)
     return 0.55 * r / 60   # 0 at goal → 0.55 at 60 cm
 
-# scatter points: r = distance to goal
+# scatter points: x = distance from goal
 vae_pts, dino_pts, r_pts = [], [], []
 for r in radii:
     for _ in range(n_per):
@@ -47,15 +48,10 @@ dino_pts = np.array(dino_pts)
 dino_scale      = vae_true(60) / dino_true(60)
 dino_pts_scaled = dino_pts * dino_scale
 
-# Trend lines: x = displacement toward goal = 60 - r
-# Plot with x on the horizontal axis (0 = start, 60 = arrived)
-r_line = np.linspace(0, 60, 300)          # distance to goal
-x_line = 60 - r_line                      # displacement toward goal
+# Trend lines: x = distance from goal (same as r)
+r_line    = np.linspace(0, 60, 300)
 vae_line  = vae_true(r_line)
 dino_line = dino_true(r_line) * dino_scale
-
-# Scatter x-coords: displacement = 60 - r
-x_pts = 60 - r_pts
 
 def smooth(y, w=12):
     return np.convolve(y, np.ones(w) / w, mode='same')
@@ -67,48 +63,47 @@ dino_s = smooth(dino_line)
 fig, axes = plt.subplots(1, 2, figsize=(10, 4.2), sharey=False)
 fig.patch.set_facecolor('#fafafa')
 
-# Far band in terms of displacement: robot is >30 cm from goal = displacement < 30
-FAR_DISP_MAX = 30   # displacement < 30 means still in far band
+# Far band: distance from goal > 30 cm (left side of reversed axis)
+FAR_DIST_MIN = 30
 
 for ax, x_sc, pts, line, color, label in [
-    (axes[0], x_pts, vae_pts,          vae_s,  '#d94f3f', 'SD-VAE latent L2'),
-    (axes[1], x_pts, dino_pts_scaled,  dino_s, '#2e7bbf', 'DINOv2 patch cosine'),
+    (axes[0], r_pts, vae_pts,          vae_s,  '#d94f3f', 'SD-VAE latent L2'),
+    (axes[1], r_pts, dino_pts_scaled,  dino_s, '#2e7bbf', 'DINOv2 patch cosine'),
 ]:
     ax.set_facecolor('#fafafa')
     ax.spines[['top', 'right']].set_visible(False)
 
-    # far band shading (low displacement = far from goal)
-    ax.axvspan(-2, FAR_DISP_MAX, color='#f0f0f0', zorder=0)
-    ax.text(2, ax.get_ylim()[1] if ax.get_ylim()[1] > 0 else 22,
-            'far from\ngoal', fontsize=8, color='#aaa', va='top')
+    # far band shading (high distance = far from goal, appears on LEFT with reversed axis)
+    ax.axvspan(FAR_DIST_MIN, 63, color='#f0f0f0', zorder=0)
+    ax.text(48, 2, 'far from\ngoal', fontsize=8, color='#aaa', va='bottom', ha='center')
 
     # noise band
-    ax.fill_between(x_line, line - noise_std * 3, line + noise_std * 3,
+    ax.fill_between(r_line, line - noise_std * 3, line + noise_std * 3,
                     color=color, alpha=0.12, zorder=1)
 
     # scatter
     ax.scatter(x_sc, pts, color=color, s=18, alpha=0.55, zorder=3, linewidths=0)
 
     # trend line
-    ax.plot(x_line, line, color=color, lw=2.2, zorder=4)
+    ax.plot(r_line, line, color=color, lw=2.2, zorder=4)
 
-    ax.set_xlabel('Displacement toward goal (cm)', fontsize=10)
-    ax.set_xlim(-2, 63)
+    ax.set_xlabel('Distance from goal (cm)', fontsize=10)
+    # reversed: far-from-goal on the left, goal on the right
+    ax.set_xlim(63, -2)
     ax.set_ylim(bottom=-1)
     ax.set_title(label, fontsize=11, color=color, pad=8)
 
-    # goal line
-    ax.axvline(60, color='#888', lw=1.0, ls=':')
-    ax.text(60.5, ax.get_ylim()[0] + 0.5, 'goal', fontsize=8, color='#888', va='bottom')
+    # goal line at x=0 (right edge)
+    ax.axvline(0, color='#888', lw=1.0, ls=':')
+    ax.text(1, ax.get_ylim()[0] + 0.5, 'goal', fontsize=8, color='#888', va='bottom')
 
-# VAE: annotate the flat region (low displacement = far from goal)
+# VAE: annotate the flat region (high distance = far from goal, left side of reversed axis)
 ax0 = axes[0]
 ax0.set_ylabel('Distance metric value (normalised)', fontsize=10)
-flat_x = 15   # displacement=15 means still 45cm from goal (far band)
 ax0.annotate(
     'gradient ≈ noise floor\nCEM cannot distinguish\ncandidate actions here',
-    xy=(flat_x, vae_true(60 - flat_x)),
-    xytext=(25, vae_true(60 - flat_x) + 6),
+    xy=(45, vae_true(45)),
+    xytext=(30, vae_true(45) + 6),
     fontsize=8, color='#d94f3f',
     arrowprops=dict(arrowstyle='->', color='#d94f3f', lw=1.1),
     bbox=dict(boxstyle='round,pad=0.3', fc='#fff8f8', ec='#d94f3f', lw=0.8)
@@ -116,12 +111,13 @@ ax0.annotate(
 
 # DINOv2: annotate steady descent in far band
 ax1 = axes[1]
-x_lo, x_hi = 5, 25
-y_lo = dino_true(60 - x_lo) * dino_scale
-y_hi = dino_true(60 - x_hi) * dino_scale
-ax1.annotate('', xy=(x_hi, y_hi), xytext=(x_lo, y_lo),
+r_lo, r_hi = 35, 55   # distance from goal; r_hi is farther (left), r_lo is closer (right)
+y_lo = dino_true(r_lo) * dino_scale
+y_hi = dino_true(r_hi) * dino_scale
+# arrow from farther (r_hi) toward closer (r_lo) — left to right visually on reversed axis
+ax1.annotate('', xy=(r_lo, y_lo), xytext=(r_hi, y_hi),
              arrowprops=dict(arrowstyle='->', color='#2e7bbf', lw=1.3))
-ax1.text((x_lo + x_hi) / 2 + 2, (y_lo + y_hi) / 2,
+ax1.text((r_lo + r_hi) / 2 - 2, (y_lo + y_hi) / 2,
          '~12× noise\nper step', fontsize=8, color='#2e7bbf', va='center',
          bbox=dict(boxstyle='round,pad=0.3', fc='#f0f6ff', ec='#2e7bbf', lw=0.8))
 
