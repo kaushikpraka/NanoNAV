@@ -41,7 +41,7 @@ This project lives squarely in the **Planner** corner of that taxonomy. It is no
 
 I was inspired by [**Nano World Models**](https://arxiv.org/abs/2605.23993) (Huang et al., 2026), a minimalist, diffusion-forcing world-model codebase released recently. The authors remark that "the broader research community still lacks compact, reproducible, and easily extensible implementations" of modern world models and set out to change that. More than the code, that framing is what grabbed me. It was a call to *democratize* world-model research, to show the ideas don't require a frontier lab's compute or data to be worth building on. That resonated, and it set the constraint that defines everything here: do this small.
 
-The Nano World Models project evaluates across simple control environments, game simulation, and **real-robot data (RT-1)**. If the recipe held on real robot data at that scale, it might hold on *mine*. I had A [**LeKiwi**](https://github.com/SIGRobotics-UIUC/LeKiwi) mobile manipulator left over from earlier imitation-learning work. So the plan was simple. Collect my own data, train a nano-scale world model on it, and see if I could plan with it on real hardware.
+The Nano World Models project evaluates across simple control environments, game simulation, and **real-robot data (RT-1)**. If the recipe held on real robot data at that scale, it might hold on *mine*. I had a [**LeKiwi**](https://github.com/SIGRobotics-UIUC/LeKiwi) mobile manipulator left over from earlier imitation-learning work. So the plan was simple. Collect my own data, train a nano-scale world model on it, and see if I could plan with it on real hardware.
 
 ---
 
@@ -97,26 +97,26 @@ Dead reckoning assumes **no significant slip**, meaning a commanded centimeter i
 
 ## 4 · The World Model
 
-The world model I used is **NanoWM**, a ~160M-parameter diffusion-forcing transformer. It does not work in pixels directly, but instead in a compressed *latent* space through a frozen Stable-Diffusion VAE. Given a few context frames and a candidate action chunk, it predicts a latent future frame. Stack those predictions and you get a *rollout*, a short imagined sequence of what latent driving would look like.
+The world model I used is **NanoWM**, a ~160M-parameter diffusion-forcing transformer that works not in pixels but in a compressed *latent* space produced by a frozen Stable-Diffusion VAE. Given a few context frames and a candidate action chunk, it predicts a latent future frame, and stacking those predictions gives a *rollout*, a short imagined sequence of what latent driving would look like.
 
-One critical knob is the **frame interval**, the temporal stride between the frames the model is trained to connect. Too short and each step barely moves the scene, leaving the action signal swamped by noise. Too long and the prediction itself becomes hard. I return to this parameter in later sections.
+One critical knob is the **frame interval**, the temporal stride between the frames the model is trained to connect. If it is too short, each step barely moves the scene and the action signal drowns in noise, while if it is too long, the prediction itself becomes hard. I return to this parameter in the next section.
 
-The key architecture choice is that the perception backbone, the VAE, is **frozen and pretrained**, while the 160M transformer is trained **from scratch** on my 50 episodes. This makes it a scene-specific latent dynamics model riding on a general perceptual backbone. It learns the physics of *this* room and generalizes to new trajectories and goals within it, not across environments.
+The key architecture choice is that the perception backbone, the VAE, is **frozen and pretrained**, while the 160M transformer is trained **from scratch** on my 50 episodes, making it a scene-specific latent dynamics model riding on a general perceptual backbone. It learns the physics of *this* room and generalizes to new trajectories and goals within it, not across environments.
 
-Training uses [**Diffusion Forcing**](https://arxiv.org/abs/2407.01392) (Chen et al., 2024), which instead of corrupting every frame to one shared noise level, gives each frame its own independent noise level. With causal masking, this lets the network roll itself out autoregressively at inference, predicting a frame, treating it as clean context, and using that to predict the next, which is exactly the loop CEM drives. The transformer learns to **denoise the next frame's latent** given recent frames and the action chunk, with the action entering through a small **additive embedding**. Training ran for roughly **12,000 steps on a single rented H100** using AdamW with effective batch 64 in bf16, completing in a single overnight run.
+Training uses [**Diffusion Forcing**](https://arxiv.org/abs/2407.01392) (Chen et al., 2024), which gives each frame its own independent noise level rather than corrupting every frame to one shared level. With causal masking, this lets the network roll itself out autoregressively at inference, predicting a frame, treating it as clean context, and using that to predict the next, which is exactly the loop CEM drives. The transformer learns to **denoise the next frame's latent** given recent frames and the action chunk. The action enters through a small **additive embedding**, a choice that turns out to matter and that I revisit in §5. Training ran for roughly **12,000 steps on a single rented H100** using AdamW with effective batch 64 in bf16, completing in a single overnight run.
 
 [FIGURE: ✅ assets/long_0_cmp.mp4 — autoplay/loop/muted]
-*Imagined vs. real. Left: a world-model rollout from 4 context frames and a recorded action sequence. Right: what the camera actually saw. It genuinely imagines driving — blurry, but directionally right.*
+*Imagined vs. real. Left: a world-model rollout from 4 context frames and a recorded action sequence. Right: what the camera actually saw. Blurry, but directionally right.*
 
 ---
 
-## 5 · Road to a working planner
+## 5 · Road to Planning
 
 Everything above is setup. What follows is the build log: each attempt, what broke, and what it taught.
 
 ### Planning: MPC + CEM in latent space
 
-How does planning latent space work? It's turns out to be quite simple, as a search over action sequences. Here is the process:
+Planning in latent space turns out to be a straightforward search over action sequences. The loop has five steps.
 
 1. Encode the current frame and goal image once.
 2. Sample candidate action sequences from a normal distribution and roll each sequence through the world model.
@@ -124,7 +124,7 @@ How does planning latent space work? It's turns out to be quite simple, as a sea
 4. Keep the top fraction, resample around them. Repeat a few iterations.
 5. Execute the first chunk of the winning plan, then replan from the new observation.
 
-At this point, the score was the **L2 over the flattened VAE latent**. This followed the [**Nano World Models**](https://arxiv.org/abs/2605.23993) paper (Huang et al., 2026), which had reported 25% planning success on PushT using exactly this representation, making it the natural starting point.
+The initial score was the **L2 over the flattened VAE latent**. The Nano World Models paper had reported 25% planning success on PushT using exactly this representation, making it the natural starting point.
 
 ---
 
@@ -136,25 +136,22 @@ The world model and CEM planner run on a rented H100 (Runpod). On the robot, a R
 
 ### Run 001
 
-This first model was trained on a frame interval of f=5 (~167 ms chunks). It failed a basic action test: roll out with the ground-truth action, zero action, and a random action. Ground-truth should land closest to what really happened. The model predicted nearly the same future regardless. Action-embedding RMS: **0.0088**. Zero and random rollouts were indistinguishable.
+This first model was trained on a frame interval of f=5 (~167 ms chunks). It failed a basic action test. Rolled out with the ground-truth action, a zero action, and a random action, the model predicted nearly the same future for all three, with an action-embedding RMS of **0.0088**. Zero and random rollouts were indistinguishable from ground-truth.
 
 ---
 
 ### Does translation exist in the latent?
 
-If the frame interval is too short, each step barely moves the scene and the action signal drowns in noise. I chose to test this on the recorded frames without retraining: encode them, hold rotation near zero, and compare stationary chunks against pure-translation chunks directly. Translation AUC: **0.94–0.98**. The signal was there. The frame interval just needed to be wider.
+If the frame interval is too short, each step barely moves the scene and the action signal drowns in noise. I chose to test this on the recorded frames without retraining, by encoding them and holding rotation near zero. This allowed me to compare stationary chunks against pure-translation chunks directly. Translation AUC was **0.94–0.98**, confirming the signal was there and the frame interval just needed to be wider.
 
 [FIGURE: ✅ assets/stationary_latent_compare.png]
 *Where motion lives in the latent. Translation lights up the near-field floor (parallax) and rotation lights up the far horizon (the FOV sweeping). The robot's own body stays put, a built-in registration check.*
-
-[FIGURE: ✅ assets/fsweep_chunk_distributions.png]
-*Latent change per chunk, across frame intervals. Raising the temporal stride lifts translation's signal above the noise floor.*
 
 ---
 
 ### Run 002
 
-Retrained at f=10. The action branch came alive: clean **true < zero < random** separation, random now distinctly worse than zero (the model uses the action's *content*, not just its presence). Decoded rollouts visibly track translation, rotation, and arcs.
+Retrained at f=10. The action branch came alive with clean **true < zero < random** separation, random now distinctly worse than zero, confirming the model uses the action's *content*, not just its presence. Decoded rollouts visibly track translation, rotation, and arcs.
 
 [FIGURE: ✅ assets/action_diagnostic.png]
 *The action test, passed. True-action rollouts clearly beat zero- and random-action. The model now responds to what it's told the robot did.*
@@ -169,9 +166,9 @@ Retrained at f=10. The action branch came alive: clean **true < zero < random** 
 
 [TODO: add goal image, start position, and video of this run]
 
-The robot wandered. L2 distance-to-goal hovered around 45 for 22 steps, yaw command flip-flopping every step. Hand-placing the robot at measured distances and recording latents directly gave a clear result: **monotone descent over 40 cm with healthy signal-to-noise**.
+The robot wandered. L2 distance-to-goal hovered around 45 for 22 steps, yaw command flip-flopping every step. Hand-placing the robot at measured distances and recording latents directly confirmed **monotone descent over 40 cm with healthy signal-to-noise**.
 
-This meant that very close to a goal, the metric has a sharp basin and the robot converges. Slightly far from it, the metric goes flat. Every direction looks equidistant and the robot wanders. The problem wasn't the camera or the planner. It was the **distance metric**.
+Very close to a goal the metric has a sharp basin and the robot converges, but slightly farther out the metric goes flat and every direction looks equidistant. The problem wasn't the camera or the planner, but the **distance metric**.
 
 ---
 
@@ -179,11 +176,11 @@ This meant that very close to a goal, the metric has a sharp basin and the robot
 
 Far from the goal, the **objective was blind**. CEM had no gradient and every candidate action looked equidistant from the goal.
 
-To find out why, three candidate metrics were measured at tape-marked positions across the room: 10–60 cm out along the approach axis and ±60 cm to either side. Each metric was graded on two requirements for CEM to work.
+To find out why, three candidate metrics were measured at tape-marked positions across the room, ranging from 10–60 cm out along the approach axis and ±60 cm to either side. Each metric was graded on two requirements for CEM to work.
 
 **Requirement 1: global ordering.** Does the metric rank positions in the correct order by distance? Measured by ρ, the Spearman rank correlation with ground-truth tape distance. ρ = 1.0 means every closer position scores closer than every farther one. This is the test most people run, and nearly everything passes it.
 
-**Requirement 2: far-field sensitivity.** In the far band (30–60 cm out), is the per-step change large enough for CEM to detect progress above the robot's own standing-still jitter? Reported as a multiple of the noise floor: 1.0× means one step forward changes the metric by exactly the same amount as the robot's natural variation at rest. Below that, CEM cannot distinguish "I moved toward the goal" from "I am still." This is the test that matters for planning, and it is where the failure hides.
+**Requirement 2: far-field sensitivity.** In the far band (30–60 cm out), is the per-step change large enough for CEM to detect progress above the robot's own standing-still jitter? The answer is reported as a multiple of the noise floor, where 1.0× means one step forward changes the metric by exactly the same amount as the robot's natural variation at rest. Below that, CEM cannot distinguish "I moved toward the goal" from "I am still." This is the test that matters for planning, and it is where the failure hides.
 
 [FIGURE: ✅ assets/sweep_diagram.png]
 *The measurement grid. The robot was hand-placed at each position and a frame was captured. Orange poses are the near band (0–30 cm), blue are the far band where CEM needs to plan. Three yaw orientations were tested at select positions.*
@@ -195,25 +192,28 @@ To find out why, three candidate metrics were measured at tape-marked positions 
 | **Frozen DINOv2 patch cosine** | 0.94 | **12×, 21×** | Passes both. |
 
 [FIGURE: ✅ assets/metric_comparison.png]
-*Both metrics use the same images. The VAE metric (left) plateaus after ~25 cm — in the far band, one step forward is indistinguishable from standing still, so CEM has nothing to minimize. DINOv2 cosine (right) maintains a clear gradient across the full range.*
+*Both metrics use the same images. The VAE metric (left) plateaus after ~25 cm, where one step forward is indistinguishable from standing still and CEM has nothing to minimize. DINOv2 cosine (right) maintains a clear gradient across the full range.*
+
+[FIGURE: ✅ assets/fsweep_chunk_distributions.png]
+*Why the VAE latent fails as a planning metric. At f=10, rotation strongly predicts latent displacement (corr=0.70), while translation magnitude barely registers (corr=0.03). Turning sweeps the far horizon across the frame and dominates the latent; driving forward produces only near-floor parallax that the VAE compresses away. A metric built on this representation cannot see translational progress.*
 
 The information was in the images all along. The VAE representation was burying it.
 
 The fix was to **retrain the world model to predict frozen DINOv2 patch tokens**, so the imagined space and the distance space are the same.
 
-The new score works as follows. DINOv2 divides an image into a grid of small patches and computes a feature vector for each one. Given two images, you compare their corresponding patches using cosine similarity, which measures how aligned two vectors are in direction regardless of magnitude. A value of 1.0 means the patches are semantically identical; 0 means nothing in common. Average those similarities across the whole grid and subtract from 1, so the score is 0 at the goal and grows as the images diverge. No training is needed for any of this. DINOv2 is frozen and pretrained; the score is just arithmetic on the output token grids.
+The new score works as follows. DINOv2 divides an image into a grid of small patches and computes a feature vector for each one. Given two images, you compare their corresponding patches using cosine similarity, which measures how aligned two vectors are in direction regardless of magnitude. A value of 1.0 means the patches are semantically identical and 0 means nothing in common. Average those similarities across the whole grid and subtract from 1, so the score is 0 at the goal and grows as the images diverge. No training is needed for any of this, since DINOv2 is frozen and pretrained and the score is just arithmetic on the output token grids.
 
 $$\text{score} = 1 - \frac{1}{N} \sum_{i=1}^{N} \cos\!\left(\mathbf{f}_i,\, \mathbf{g}_i\right)$$
 
 *N is the number of patches. **f**_i and **g**_i are the DINOv2 patch token vectors for patch i of the imagined frame and the goal image.*
 
-This is essentially **DINO-WM** (Zhou et al., 2024), arrived at through measurement. Two differences: a generative diffusion-forcing backbone instead of a deterministic predictor, and closed-loop operation on a real robot.
+This is essentially **DINO-WM** (Zhou et al., 2024), arrived at through measurement. The main differences are a generative diffusion-forcing backbone instead of a deterministic predictor and closed-loop operation on a real robot.
 
 On the robot, the retrained model drove distance down from 0.32 → 0.19, committing from far out where the VAE objective had been flat.
 
-One practical note: DINOv2 tokens are not directly human-readable. To watch the model think, a small **token-to-RGB decoder** was trained separately to map predicted token grids back to approximate pixel frames. The planner itself never uses it; it scores entirely in token space. The decoder exists purely for visualization, and is what produces the filmstrip figures in this post.
+DINOv2 tokens are not directly human-readable, so to watch the model think, a small **token-to-RGB decoder** was trained separately to map predicted token grids back to approximate pixel frames. The planner itself never uses it, scoring entirely in token space, and the decoder exists purely for visualization.
 
-The retrain also answered the Run 001 question. Switching the prediction target from VAE latents to DINOv2 tokens meant training from scratch, which opened a clean opportunity to probe what had actually caused the dead action. Run 001 used VAE latents with additive injection. Two explanations were possible: the VAE representation was too weak for action conditioning to matter, or the additive injection method was too easy to ignore regardless of representation. Running both injection methods against the same semantic latents settled it. The dead action was not an inherent incompatibility with semantic latents. It was the injection method.
+The retrain also answered the Run 001 question. Switching the prediction target from VAE latents to DINOv2 tokens meant training from scratch, which opened a clean opportunity to probe what had actually caused the dead action. Run 001 used VAE latents with additive injection, leaving two explanations open. Either the VAE representation was too weak for action conditioning to matter, or the additive injection method was too easy to ignore regardless of representation. Running both injection methods against the same semantic latents settled it. The dead action was not an inherent incompatibility with semantic latents, but a problem with the injection method.
 
 **Additive injection** adds the action embedding as a residual to each transformer layer. The model can neutralize that influence by learning to make the residual contribution small. With a strong semantic signal already dominating the latents, that is exactly what happened, and the action embedding RMS atrophied to 0.0028.
 
@@ -252,11 +252,11 @@ Edge thresholds and waypoint spacing are both calibrated from data. The weld thr
 
 **2. Welds also encode direction.** A weld can silently place a waypoint ~10 cm behind the robot, and tightening the threshold to prevent this collapsed map connectivity. The fix is **motion-parallax certification**: for a weld from frame i to frame j, verify that i's time-successors get closer to j. If they do, j is provably ahead. No new data required. This produced ~17,800 directed welds with 94.5% strong connectivity.
 
-**3. Localization and waypoint tuning.** On the robot, localization flip-flopped between look-alike frames in different episodes, causing the route to re-roll every step. The fix was hysteresis: commit to a path and require strong evidence before re-routing. Waypoints placed too close gave CEM a nearly-identical target, producing near-zero commands, fixed by enforcing a minimum waypoint spacing.
+**3. Localization and waypoint tuning.** On the robot, localization flip-flopped between look-alike frames in different episodes, causing the route to re-roll every step. The fix was hysteresis, committing to a path and requiring strong evidence before re-routing. Waypoints placed too close gave CEM a nearly-identical target, producing near-zero commands, fixed by enforcing a minimum waypoint spacing.
 
 [FIGURE: ⏳ TODO — insert additional on-robot success run videos here (e.g. screen recordings or .rrd traces of multiple goal-reach runs)]
 
-**REACHED nearpurifier.** 129 steps, 40-hop route, localization tracked the whole way, metric closed 0.30 → 0.08. First full end-to-end run on the robot.
+The robot reached the **nearpurifier** goal in 129 steps along a 40-hop route, with localization tracked the whole way and the metric closing from 0.30 to 0.08. First full end-to-end success.
 
 Without the graph, the flat planner succeeds from a start distance of 0.35 but wanders from 0.45. The graph crosses exactly that threshold.
 
