@@ -169,28 +169,28 @@ Retrained at f=10. The action branch came alive with clean **true < zero < rando
 
 [TODO: add goal image, start position, and video of this run]
 
-The robot wandered. L2 distance-to-goal hovered around 45 for 22 steps, yaw command flip-flopping every step. Hand-placing the robot at measured distances and recording latents directly confirmed **monotone descent over 40 cm with healthy signal-to-noise**.
+The robot wandered. The VAE latent L2 distance-to-goal hovered around 45 (a raw latent distance, not centimetres) for 22 steps, with the yaw command flip-flopping every step. The world model rollouts looked reasonable and the planner was sampling correctly, which pointed the blame at the **distance metric** rather than either of them.
 
-Very close to a goal the metric has a sharp basin and the robot converges, but slightly farther out the metric goes flat and every direction looks equidistant. The problem wasn't the camera or the planner, but the **distance metric**.
+To check, I hand-placed the robot at measured distances from the goal, varied its yaw orientation at each position, and recorded the latents for three candidate metrics: pixel L1, SD-VAE latent L2, and frozen DINOv2 patch cosine. Each metric decreased monotonically with distance, which looked reassuring. What that test missed was the rate of decrease: in the far band the gradient was so shallow it was buried in the robot's own standing-still noise, so CEM could not distinguish one candidate action from another. That failure only became clear through the systematic sweep described in the next section.
 
 ---
 
 ### The semantic pivot
 
-Far from the goal, the **objective was blind**. CEM had no gradient and every candidate action looked equidistant from the goal.
+Far from the goal, the **objective was blind**, giving CEM no gradient and making every candidate action look equidistant from the goal.
 
-To find out why, three candidate metrics were measured at tape-marked positions across the room, ranging from 10–60 cm out along the approach axis and ±60 cm to either side. Each metric was graded on two requirements for CEM to work.
+To find out why, I measured three candidate metrics at tape-marked positions across the room, ranging from 10–60 cm out along the approach axis and ±60 cm to either side. I graded each on two requirements for CEM to work.
 
-**Requirement 1: global ordering.** Does the metric rank positions in the correct order by distance? Measured by ρ, the Spearman rank correlation with ground-truth tape distance. ρ = 1.0 means every closer position scores closer than every farther one. This is the test most people run, and nearly everything passes it.
+**Requirement 1: global ordering.** Does the metric rank positions in the correct order by distance? I measured this with ρ, the Spearman rank correlation with ground-truth tape distance, where ρ = 1.0 means every closer position scores closer than every farther one. This is the test most people run, and nearly everything passes it.
 
-**Requirement 2: far-field sensitivity.** In the far band (30–60 cm out), is the per-step change large enough for CEM to detect progress above the robot's own standing-still jitter? The answer is reported as a multiple of the noise floor, where 1.0× means one step forward changes the metric by exactly the same amount as the robot's natural variation at rest. Below that, CEM cannot distinguish "I moved toward the goal" from "I am still." This is the test that matters for planning, and it is where the failure hides.
+**Requirement 2: far-field sensitivity.** In the far band (30–60 cm out), is the per-step change large enough for CEM to detect progress above the robot's own standing-still jitter? I report this as a multiple of the noise floor, where 1.0× means one step forward changes the metric by exactly the same amount as the robot's natural variation at rest. Below that, CEM cannot distinguish "I moved toward the goal" from "I am still." This is the test that matters for planning, and it is where the failure hides.
 
 [FIGURE: ✅ assets/sweep_diagram.png]
-*The measurement grid. The robot was hand-placed at each position and a frame was captured. Orange poses are the near band (0–30 cm), blue are the far band where CEM needs to plan. Three yaw orientations were tested at select positions.*
+*The measurement grid. I hand-placed the robot at each position and captured a frame. Orange poses are the near band (0–30 cm), blue are the far band where CEM needs to plan. Three yaw orientations were tested at select positions.*
 
 | Metric | Ordering (ρ) | Far-field signal / noise | Why it fails |
 |---|---|---|---|
-| Pixel L1 | 1.00 | 706×, 386× | Strong signal, but lateral ordering breaks: the metric increases when moving sideways even when that sideways position is closer. CEM would overcorrect. |
+| Pixel L1 | 1.00 | 706×, 386× | Strong signal, but lateral ordering breaks. The metric increases when moving sideways even when that sideways position is closer, so CEM would overcorrect. |
 | **SD-VAE latent L2** | 1.00 | **1.25×, 0.80×** | Perfect global ordering, but the far-field gradient is at or below the noise floor. CEM cannot see progress more than ~25 cm out. |
 | **Frozen DINOv2 patch cosine** | 0.94 | **12×, 21×** | Passes both. |
 
@@ -200,7 +200,7 @@ To find out why, three candidate metrics were measured at tape-marked positions 
 [FIGURE: ✅ assets/fsweep_chunk_distributions.png]
 *Why the VAE latent fails as a planning metric. At f=10, rotation strongly predicts latent displacement (corr=0.70), while translation magnitude barely registers (corr=0.03). Turning sweeps the far horizon across the frame and dominates the latent; driving forward produces only near-floor parallax that the VAE compresses away. A metric built on this representation cannot see translational progress.*
 
-The information was in the images all along. The VAE representation was burying it.
+The information was in the images all along and the VAE representation was burying it.
 
 The fix was to **retrain the world model to predict frozen DINOv2 patch tokens**, so the imagined space and the distance space are the same.
 
@@ -212,9 +212,9 @@ $$\text{score} = 1 - \frac{1}{N} \sum_{i=1}^{N} \cos\!\left(\mathbf{f}_i,\, \mat
 
 This is essentially **DINO-WM** (Zhou et al., 2024), arrived at through measurement. The main differences are a generative diffusion-forcing backbone instead of a deterministic predictor and closed-loop operation on a real robot.
 
-On the robot, the retrained model drove distance down from 0.32 → 0.19, committing from far out where the VAE objective had been flat.
+On the robot, the retrained model drove the DINOv2 cosine distance to goal down from 0.32 to 0.19 (on a 0–1 scale), committing from far out where the VAE objective had been flat.
 
-DINOv2 tokens are not directly human-readable, so to watch the model think, a small **token-to-RGB decoder** was trained separately to map predicted token grids back to approximate pixel frames. The planner itself never uses it, scoring entirely in token space, and the decoder exists purely for visualization.
+DINOv2 tokens are not directly human-readable, so to watch the model think, I trained a small **token-to-RGB decoder** separately to map predicted token grids back to approximate pixel frames. The planner itself never uses it, scoring entirely in token space, and the decoder exists purely for visualization.
 
 The retrain also answered the Run 001 question. Switching the prediction target from VAE latents to DINOv2 tokens meant training from scratch, which opened a clean opportunity to probe what had actually caused the dead action. Run 001 used VAE latents with additive injection, leaving two explanations open. Either the VAE representation was too weak for action conditioning to matter, or the additive injection method was too easy to ignore regardless of representation. Running both injection methods against the same semantic latents settled it. The dead action was not an inherent incompatibility with semantic latents, but a problem with the injection method.
 
@@ -227,7 +227,10 @@ $$\text{output} = \gamma(\mathbf{a}) \cdot \text{LayerNorm}(x) + \beta(\mathbf{a
 Because the action now multiplicatively controls the scale of the entire feature map at every layer, the model cannot reduce its influence by tuning a weight toward zero. On the same semantic latents where additive injection collapsed to 0.0028 RMS, AdaLN held at 0.2 RMS.
 
 [FIGURE: ✅ assets/c1_smoke_strip.png]
-*Imagining in semantic space. The world model predicts DINOv2 tokens; a small decoder renders them back to pixels for visualization (the planner scores in token space and never decodes).*
+*Imagining in semantic space. The world model predicts DINOv2 tokens, and a small decoder renders them back to pixels for visualization. The planner scores in token space and never decodes.*
+
+[FIGURE: ⏳ assets/dinov2_planner_demo.mp4 — on-robot demo of the DINOv2 flat planner reaching a nearby goal]
+*[TODO: short clip of the DINOv2 planner working on the robot without the graph — goal within ~40 cm, metric descending, robot converging. Shows the metric works before introducing the graph as the solution to its range limit.]*
 
 ---
 
