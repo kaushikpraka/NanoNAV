@@ -68,7 +68,7 @@ The stock LeKiwi uses a low front-facing webcam, which I replaced with wider-ang
 
 ## 3 · Data
 
-The most important constraint on data collection was what the model actually needs to learn. At inference time the planner proposes dozens of candidate action sequences, including bad ones, and the world model has to predict what each would produce in order to rank them. Training only on clean, goal-directed demonstrations would leave the model blind to wrong actions and unable to help the planner reject them. So the collection goal was coverage, not demonstration: fill the space, vary headings, and make sure the model has seen the consequences of turning the wrong way.
+The most important constraint on data collection was what the model actually needs to learn. At inference time the [planner](#road-to-a-working-planner) proposes dozens of candidate action sequences, including bad ones, and the world model has to predict what each would produce in order to rank them. Training only on clean, goal-directed demonstrations would leave the model blind to wrong actions and unable to help the planner reject them. So the collection goal was coverage, not demonstration: fill the space, vary headings, and make sure the model has seen the consequences of turning the wrong way.
 
 Collection was entirely manual, using **LeRobot's `record` pipeline** to timestamp and synchronize the overhead camera with commanded base velocities at 30 Hz. For teleoperation, a PS5 DualSense connected over USB drove forward velocity on the left stick and yaw rate on the right, with no strafe binding so sideways velocity is zero by construction.
 
