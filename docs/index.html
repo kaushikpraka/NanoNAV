@@ -11,8 +11,8 @@
 
 <header class="masthead">
   <h1>NanoNAV: Real-Robot Navigation with <a href="https://arxiv.org/abs/2605.23993">Nano World Models</a></h1>
-  <p class="subtitle">Latent-space planning drives a small robot to goal images — learned from 25 minutes of driving, no maps, no depth, no pose.</p>
-  <div class="byline">Kaushik Prakash · June 2026 · <a href="https://github.com/KaushikTheProgrammer/NanoNAV">code on GitHub</a></div>
+  <p class="subtitle">Latent-space planning drives a small robot to goal images</p>
+  <div class="byline">Kaushik Prakash · June 2026 · code: coming soon</div>
 </header>
 
 <div class="hero">
@@ -38,7 +38,7 @@
     <li><a href="#robot-hardware">Robot Hardware</a></li>
     <li><a href="#data">Data</a></li>
     <li><a href="#the-world-model">The World Model</a></li>
-    <li><a href="#the-long-road-to-a-working-planner">The long road to a working planner</a></li>
+    <li><a href="#road-to-a-working-planner">Road to a working planner</a></li>
     <li><a href="#honest-limitations-and-part-2">Honest limitations, and part 2</a></li>
   </ol>
 </nav>
@@ -116,29 +116,39 @@
   <figcaption><b>Imagined vs. real.</b> Left: a world-model rollout from 4 context frames and a recorded action sequence. Right: what the camera actually saw. It genuinely imagines driving — blurry, but directionally right.</figcaption>
 </figure>
 
-<h2 id="the-long-road-to-a-working-planner">5 · The long road to a working planner</h2>
+<h2 id="road-to-a-working-planner">5 · Road to a working planner</h2>
 
 <p>Everything above is setup. What follows is the build log: each attempt, what broke, and what it taught.</p>
 
-<h3>The first run</h3>
+<h3>Planning: MPC + CEM in latent space</h3>
 
-<p>The first model failed the basic action test: roll out with the ground-truth action, zero action, and a random action — ground-truth should land closest to what really happened. Run 001 predicted nearly the same future regardless. Action-embedding RMS: <strong>0.0088</strong>. Zero and random rollouts were indistinguishable.</p>
+<p>How does planning latent space work? It's turns out to be quite simple, as a search over action sequences. Here is the process:</p>
 
-<p>My first hypothesis for why was wrong. Then my second was too.</p>
+<ol>
+  <li>Encode the current frame and goal image once.</li>
+  <li>Sample candidate action sequences from a normal distribution and roll each sequence through the world model.</li>
+  <li>Score each imagined endpoint by <strong>distance to the goal in latent space</strong>.</li>
+  <li>Keep the top fraction, resample around them. Repeat a few iterations.</li>
+  <li>Execute the first chunk of the winning plan, then replan from the new observation.</li>
+</ol>
 
-<h3>Is translation even visible?</h3>
+<p>At this point, the score was the <strong>L2 over the flattened VAE latent</strong>. This followed the <a href="https://arxiv.org/abs/2605.23993"><strong>Nano World Models</strong></a> paper (Huang et al., 2026), which had reported 25% planning success on PushT using exactly this representation, making it the natural starting point.</p>
 
-<p>Hypothesis: the frame interval was too short, so each step moved the scene too little for the action signal to clear the noise. Test: encode the recorded frames and measure latent change vs. action at several frame intervals — no retraining required.</p>
+<h3>Inference setup</h3>
 
-<p>Initial results: <strong>rotation</strong> correlated ~0.64–0.70 with latent change at every interval. <strong>Translation</strong> correlated at ~0.00. This nearly pointed to the camera mount as the problem.</p>
+<p>The world model and CEM planner run on a rented H100 (Runpod). On the robot, a Raspberry Pi runs LeRobot's LeKiwi host, a ZMQ server that streams the overhead frame and accepts velocity commands. An SSH reverse tunnel connects the two. Each plan drives the base for one chunk (~0.33 s), then the robot stops and waits while the next plan computes (~7 s). This is <strong>stop-and-plan, not real-time control</strong>, which makes network latency irrelevant.</p>
 
-<p>Wrong test. Forward speed is nearly bang-bang, so there's almost no spread in "amount of translation" for a correlation to latch onto; large rotational swings drag the pooled number toward zero. A flat correlation doesn't mean no signal.</p>
+<h3>Run 001</h3>
 
-<p>Fix: <strong>controlled contrast</strong> — hold rotation near zero, compare stationary chunks against pure-translation chunks directly. Translation AUC: <strong>0.94–0.98</strong>. The signal was there; the frame interval just needed to be wider.</p>
+<p>This first model was trained on a frame interval of f=5 (~167 ms chunks). It failed a basic action test: roll out with the ground-truth action, zero action, and a random action. Ground-truth should land closest to what really happened. The model predicted nearly the same future regardless. Action-embedding RMS: <strong>0.0088</strong>. Zero and random rollouts were indistinguishable.</p>
+
+<h3>Does translation exist in the latent?</h3>
+
+<p>If the frame interval is too short, each step barely moves the scene and the action signal drowns in noise. I chose to test this on the recorded frames without retraining: encode them, hold rotation near zero, and compare stationary chunks against pure-translation chunks directly. Translation AUC: <strong>0.94–0.98</strong>. The signal was there. The frame interval just needed to be wider.</p>
 
 <figure>
   <img src="assets/stationary_latent_compare.png" alt="">
-  <figcaption><b>Where motion lives in the latent.</b> Translation lights up the near-field floor (parallax); rotation lights up the far horizon (the FOV sweeping). The robot's own body stays put — a built-in registration check.</figcaption>
+  <figcaption><b>Where motion lives in the latent.</b> Translation lights up the near-field floor (parallax) and rotation lights up the far horizon (the FOV sweeping). The robot's own body stays put, a built-in registration check.</figcaption>
 </figure>
 
 <figure>
@@ -152,7 +162,7 @@
 
 <figure>
   <img src="assets/action_diagnostic.png" alt="">
-  <figcaption><b>The action test, passed.</b> True-action rollouts clearly beat zero- and random-action — the model now responds to what it's told the robot did.</figcaption>
+  <figcaption><b>The action test, passed.</b> True-action rollouts clearly beat zero- and random-action. The model now responds to what it's told the robot did.</figcaption>
 </figure>
 
 <figure>
@@ -163,78 +173,65 @@
   <figcaption><b>Motion tracking.</b> The world model follows a real rotation (left) and a real translation (right), error growing over the horizon as expected.</figcaption>
 </figure>
 
-<h3>Planning: CEM in latent space</h3>
-
-<p>Planning is a search over action sequences:</p>
-
-<ol>
-  <li>Encode the current frame and goal image once.</li>
-  <li>Sample candidate action sequences; roll each through the world model.</li>
-  <li>Score each imagined endpoint by <strong>distance to the goal in latent space</strong>.</li>
-  <li>Keep the top fraction, resample around them (CEM). Repeat a few iterations.</li>
-  <li>Execute the first chunk of the winning plan; replan from the new observation.</li>
-</ol>
-
-<p>The score is a fixed formula — no additional learning — and the same number on the current frame is the arrival readout. The initial formula: plain <strong>L2 over the flattened VAE latent</strong>. That choice nearly sank the project.</p>
-
-<h3>Inference setup</h3>
-
-<p>World model and CEM planner run on a rented H100 (Runpod). The robot runs LeRobot's LeKiwi host on a Raspberry Pi — a ZMQ server that streams the overhead frame and accepts velocity commands. An SSH reverse tunnel connects the two. Each plan drives the base for one chunk (~0.33 s); the robot then stops while the next plan computes (~7 s). <strong>Stop-and-plan, not real-time control</strong> — the network latency is irrelevant at that cadence.</p>
-
 <h3>First closed-loop run</h3>
 
-<p>The robot wandered: distance-to-goal hovered around 45 for 22 steps, yaw command flip-flopping every step. A "drive straight at the goal" probe showed the metric flat for 46 cm of travel.</p>
+<p>The robot wandered. Distance-to-goal hovered around 45 for 22 steps, yaw command flip-flopping every step. Hand-placing the robot at measured distances and recording latents directly gave a clear result: <strong>monotone descent over 40 cm with healthy signal-to-noise</strong>.</p>
 
-<p>Test: hand-place the robot at measured distances and record latents directly. Result: <strong>monotone over 40 cm with healthy signal-to-noise</strong>. The "flat 46 cm" was the robot drifting off the approach axis.</p>
-
-<p>The real finding: close to a goal, the metric has a sharp basin and converges. Far from it, the metric goes flat — every direction looks equidistant — and the robot wanders. The problem wasn't the camera or the planner. It was the <strong>distance metric</strong>.</p>
-
-<figure>
-  <img src="assets/dist_sweep_curve.png" alt="">
-  <figcaption><b>Metric measured directly.</b> Hand-placed at increasing distance, it decreases monotonically — not flat. The earlier "flat" reading was off-axis drift.</figcaption>
-</figure>
+<p>Close to a goal, the metric has a sharp basin and the robot converges. Far from it, the metric goes flat. Every direction looks equidistant and the robot wanders. The problem wasn't the camera or the planner. It was the <strong>distance metric</strong>.</p>
 
 <h3>The semantic pivot</h3>
 
-<p>Two failures were coupled. Far from the goal, the <strong>objective was blind</strong> — CEM had no gradient to descend. From under-covered poses, the world model <strong>hallucinated</strong> — its rollout snapped to a completely different part of the room (diffusion models don't degrade gracefully off-distribution; they teleport). With hallucinated latents, the distance readout and CEM objective are both garbage.</p>
+<p>Far from the goal, the <strong>objective was blind</strong>. CEM had no gradient and every candidate action looked equidistant from the goal.</p>
 
-<p>Measured at tape-measured displacements (10–60 cm out, ±60 cm lateral, ±30° yaw):</p>
+<p>To find out why, each candidate metric was measured at tape-marked positions across the room (10–60 cm out, ±60 cm lateral, ±30° yaw). Two things were tested for each: whether it correctly orders positions by distance at all (ρ, the correlation with true distance), and whether its gradient in the far band stays above the standing-still noise floor — the number CEM actually needs. A metric can score ρ = 1.00 globally and still be useless if the gradient per step is buried in noise.</p>
+
+<figure>
+  <img src="assets/sweep_diagram.png" alt="">
+  <figcaption><b>The measurement setup.</b> The robot was hand-placed at each grid position and a frame was captured. Orange poses are the near band (0–30 cm), blue are the far band where CEM needs to plan. At select positions, three yaw orientations were tested (±25°).</figcaption>
+</figure>
 
 <table>
-  <thead><tr><th>Distance candidate</th><th>Radial ρ</th><th>Far-band slope / σ (radial · lateral)</th><th>Verdict</th></tr></thead>
+  <thead><tr><th>Metric</th><th>Global ordering (ρ)</th><th>Far-field gradient / noise (radial, lateral)</th><th>Verdict</th></tr></thead>
   <tbody>
-    <tr><td>Pixel L1</td><td>1.00</td><td>706 · 386</td><td>fail — lateral ordering breaks</td></tr>
-    <tr><td><strong>SD-VAE latent L2</strong></td><td>1.00</td><td><strong>1.25 · 0.80</strong></td><td><strong>FAIL</strong> — far-field gradient below noise floor</td></tr>
-    <tr><td><strong>Frozen DINOv2 patch cosine</strong></td><td>0.94</td><td><strong>12 · 21</strong></td><td><strong>PASS</strong></td></tr>
+    <tr><td>Pixel L1</td><td>1.00</td><td>706×, 386×</td><td>fail (lateral ordering wrong)</td></tr>
+    <tr><td><strong>SD-VAE latent L2</strong></td><td>1.00</td><td><strong>1.25×, 0.80×</strong></td><td><strong>FAIL</strong> (gradient below noise floor)</td></tr>
+    <tr><td><strong>Frozen DINOv2 patch cosine</strong></td><td>0.94</td><td><strong>12×, 21×</strong></td><td><strong>PASS</strong></td></tr>
   </tbody>
 </table>
 
+<figure>
+  <img src="assets/metric_comparison.png" alt="">
+  <figcaption><b>Both metrics use the same images.</b> The VAE metric (left) plateaus after ~25 cm — in the far band, one step forward is indistinguishable from standing still, so CEM has nothing to minimize. DINOv2 cosine (right) maintains a clear gradient across the full range.</figcaption>
+</figure>
+
 <p>The information was in the images all along. The VAE representation was burying it.</p>
 
-<p>Fix: <strong>retrain the world model to predict frozen DINOv2 patch tokens</strong>, so the imagined space and the distance space are the same. The score becomes one minus average per-patch cosine similarity — zero additional training required.</p>
+<p>The fix was to <strong>retrain the world model to predict frozen DINOv2 patch tokens</strong>, so the imagined space and the distance space are the same. The score becomes one minus average per-patch cosine similarity, requiring no additional training.</p>
 
 <p>This is essentially <strong>DINO-WM</strong> (Zhou et al., 2024), arrived at through measurement. Two differences: a generative diffusion-forcing backbone instead of a deterministic predictor, and closed-loop operation on a real robot.</p>
 
-<p>The retrained model resolved both failures. From the exact frame that had hallucinated a different room, it now produces a soft, same-scene prediction. On the robot: distance descended 0.32 → 0.19, committing from far out.</p>
+<p>On the robot, the retrained model drove distance down from 0.32 → 0.19, committing from far out where the VAE objective had been flat.</p>
 
-<p>Run 001's dead-action failure was also settled here. The cause wasn't semantic latents — it was the <strong>injection path</strong>: additive injection atrophied to 0.0028 RMS; AdaLN on the same latents held at 0.2.</p>
+<p>One practical note: DINOv2 tokens are not directly human-readable. To watch the model think, a small <strong>token-to-RGB decoder</strong> was trained separately on the same episodes — it learns to map predicted token grids back to approximate pixel frames. The planner itself never uses it; it scores entirely in token space. The decoder exists purely for visualization, and is what produces the filmstrip figures in this post.</p>
+
+<p>The retrain also answered the Run 001 question. The dead action wasn't an inherent incompatibility with semantic latents — it was the injection method. Additive injection adds the action as a small residual to each latent; with a strong semantic signal already dominating, the model learns to ignore it (RMS atrophied to 0.0028). AdaLN injection has the action modulate the scale and shift of the entire feature map, a stronger signal the model can't as easily tune out. On the same semantic latents, AdaLN held at 0.2 RMS.</p>
 
 <figure>
   <img src="assets/c1_smoke_strip.png" alt="">
-  <figcaption><b>Imagining in semantic space.</b> The world model predicts DINOv2 tokens; a small decoder renders them back to pixels for visualization — the planner scores in token space and never decodes. Soft but correct, and from a previously-hallucinated viewpoint, it stays in the right room.</figcaption>
+  <figcaption><b>Imagining in semantic space.</b> The world model predicts DINOv2 tokens; a small decoder renders them back to pixels for visualization (the planner scores in token space and never decodes). Soft but correct, and from a previously-hallucinated viewpoint, it stays in the right room.</figcaption>
 </figure>
 
 <div class="pending"><b>Pending figure.</b> hallucination before/after — pull results/hamper_retest_*.png and the old live-distribution-gap montage from the pod</div>
 
-<h3>Beyond the basin: the graph</h3>
+<h3>Building a waypoint graph</h3>
 
-<p>The new metric is good for ~40 cm. The room is several meters across. Every frame in the training data is a place the robot demonstrably reached — so the training data becomes the map.</p>
+<p>The new metric is good for ~40 cm. Beyond that, the goal is out of range and the planner has no signal — start 180° rotated from the goal and CEM has nothing to descend. Every frame in the training data is a place the robot demonstrably reached, so the training data becomes the map.</p>
 
-<p><strong>Construction:</strong> cache DINOv2 tokens for ~4,500 frames (every chunk boundary). Add <strong>temporal edges</strong> between consecutive frames within each episode. Add <strong>weld edges</strong> wherever two different episodes pass through the same view (by token distance threshold). Fifty disconnected episode threads fuse into one connected map.</p>
+<p>To build it, DINOv2 tokens are cached for ~4,500 frames (one per chunk boundary), each becoming a <strong>node</strong>. <strong>Temporal edges</strong> connect consecutive frames within each episode. <strong>Weld edges</strong> connect frames from different episodes that pass through the same view, detected by token distance. Fifty disconnected episode threads fuse into one connected map.</p>
 
-<p><strong>At runtime:</strong> localize the live frame against the cache, run Dijkstra to the goal node, hand the planner the next <strong>waypoint</strong> — always a real remembered frame, about one reach away. CEM only ever sees the local, solvable problem.</p>
+<p>At runtime, the live frame is localized against the cache, Dijkstra finds the path to the goal node, and the planner receives the next <strong>waypoint</strong>. The waypoint is always a real remembered frame, about one reach away. CEM only ever sees the local, solvable problem.</p>
 
-<p>Edge thresholds and waypoint spacing are calibrated from data: the weld threshold from inter-frame distance distributions; the waypoint spacing from a reliability curve (one-step descent succeeds 96% at 2 chunks, falling off by 10 — waypoints land at the 90% point).</p>
+<p>Edge thresholds and waypoint spacing are both calibrated from data. The weld threshold comes from inter-frame distance distributions. The waypoint spacing comes from a measured reliability curve where one-step descent succeeds 96% of the time at 2 chunks, falling off beyond that, so waypoints are placed at the 90% reliability point.</p>
 
 <figure class="wide">
   <img src="assets/route_montage.png" alt="">
@@ -248,15 +245,15 @@
 
 <h3>Three failures on the way to the first graph success</h3>
 
-<p><strong>1. The graph must be directed.</strong> First routes sent waypoints backwards along episode threads. This robot has no reverse — data is forward-only. Temporal edges became one-way.</p>
+<p><strong>1. The graph must be directed.</strong> First routes sent waypoints backwards along episode threads. This robot doesn't reverse (yet) and data is forward-only. Temporal edges became one-way.</p>
 
-<p><strong>2. Welds also encode direction.</strong> A weld can silently place a waypoint ~10 cm behind the robot; tightening the threshold to prevent this collapsed map connectivity. Fix: <strong>motion-parallax certification</strong> — for a weld from frame i to frame j, verify that i's time-successors get closer to j. If they do, j is provably ahead. No new data required. Result: ~17,800 directed welds, 94.5% strongly connected.</p>
+<p><strong>2. Welds also encode direction.</strong> A weld can silently place a waypoint ~10 cm behind the robot, and tightening the threshold to prevent this collapsed map connectivity. The fix is <strong>motion-parallax certification</strong>: for a weld from frame i to frame j, verify that i's time-successors get closer to j. If they do, j is provably ahead. No new data required. This produced ~17,800 directed welds with 94.5% strong connectivity.</p>
 
-<p><strong>3. Localization and waypoint tuning.</strong> On the robot: localization flip-flopped between look-alike frames in different episodes, causing the route to re-roll every step. Fix: hysteresis — commit to a path and require strong evidence to re-route. Waypoints placed too close gave CEM a nearly-identical target, producing near-zero commands. Fix: minimum waypoint spacing.</p>
+<p><strong>3. Localization and waypoint tuning.</strong> On the robot, localization flip-flopped between look-alike frames in different episodes, causing the route to re-roll every step. The fix was hysteresis: commit to a path and require strong evidence before re-routing. Waypoints placed too close gave CEM a nearly-identical target, producing near-zero commands, fixed by enforcing a minimum waypoint spacing.</p>
 
-<p><strong>Result: REACHED nearpurifier</strong> — 129 steps, 40-hop route, localization tracked the whole way, metric closed 0.30 → 0.08. First full end-to-end run on the robot.</p>
+<p><strong>REACHED nearpurifier.</strong> 129 steps, 40-hop route, localization tracked the whole way, metric closed 0.30 → 0.08. First full end-to-end run on the robot.</p>
 
-<p><strong>The A/B:</strong> without the graph, the flat planner succeeds from 0.35 but wanders from 0.45. The graph crosses exactly that threshold.</p>
+<p>Without the graph, the flat planner succeeds from a start distance of 0.35 but wanders from 0.45. The graph crosses exactly that threshold.</p>
 
 <figure>
   <img src="assets/route_strip_subgoals.png" alt="">
@@ -288,7 +285,7 @@
 </ul>
 
 <hr>
-<p><em>Code, training configs, and the full experiment log are on <a href="https://github.com/KaushikTheProgrammer/NanoNAV">GitHub</a>. Built on <a href="https://github.com/huggingface/lerobot">LeRobot</a> (LeKiwi), <a href="https://arxiv.org/abs/2605.23993">Nano World Models</a>, and frozen <a href="https://github.com/facebookresearch/dinov2">DINOv2</a> features. On-robot recordings (Rerun <code>.rrd</code>) are published as a <a href="https://github.com/KaushikTheProgrammer/NanoNAV/releases/tag/recordings-v1">GitHub release</a>.</em></p>
+<p><em>Code coming soon. Built on <a href="https://github.com/huggingface/lerobot">LeRobot</a> (LeKiwi), <a href="https://arxiv.org/abs/2605.23993">Nano World Models</a>, and frozen <a href="https://github.com/facebookresearch/dinov2">DINOv2</a> features.</em></p>
 
 </article>
 
