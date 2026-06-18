@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>NanoNAV — real-robot navigation with Nano World Models</title>
 <meta name="description" content="Latent-space planning with a Nano World Model drives a LeKiwi robot to goal images — learned from 25 minutes of driving, no maps, no depth, no pose.">
-<link rel="stylesheet" href="style.css?v=1781803829">
+<link rel="stylesheet" href="style.css?v=1781804228">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
 </head>
 <body>
@@ -74,36 +74,34 @@
 
 <h2 id="data">3 · Data</h2>
 
-<p>Collection was entirely manual. The recording side is <strong>LeRobot's <code>record</code> pipeline</strong>, which timestamps and synchronizes the overhead camera with the commanded base velocity at 30 Hz. For teleoperation, I configured a PS5 DualSense controller plugged in over USB and mapped through LeRobot's teleop interface. The left stick was for forward velocity and right stick for yaw rate, with no strafe binding so sideways velocity is zero by construction. The entire data-collection setup is a game controller and a laptop.</p>
+<p>The most important constraint on data collection was what the model actually needs to learn. At inference time the planner proposes dozens of candidate action sequences, including bad ones, and the world model has to predict what each would produce in order to rank them. Training only on clean, goal-directed demonstrations would leave the model blind to wrong actions and unable to help the planner reject them. So the collection goal was coverage, not demonstration: fill the space, vary headings, and make sure the model has seen the consequences of turning the wrong way.</p>
+
+<p>Collection was entirely manual, using <strong>LeRobot's <code>record</code> pipeline</strong> to timestamp and synchronize the overhead camera with commanded base velocities at 30 Hz. For teleoperation, a PS5 DualSense connected over USB drove forward velocity on the left stick and yaw rate on the right, with no strafe binding so sideways velocity is zero by construction.</p>
 
 <div class="pending"><b>Pending figure.</b> The full data-collection rig. A PS5 DualSense over USB mapped to forward velocity and yaw rate. 25 minutes of driving with this produced the entire dataset.</div>
 
-<p>The dataset is on HuggingFace at <a href="https://huggingface.co/datasets/kaushikpraka/wm-smallarea_merged">kaushikpraka/wm-smallarea_merged</a>, viewable in the <a href="https://huggingface.co/spaces/lerobot/visualize_dataset">LeRobot visualizer</a>.</p>
-
-<p>The dataset is <strong>50 teleoperated episodes, 44,926 frames at 30 Hz</strong> of deliberate <em>exploratory driving, not goal demonstrations</em>. The model's job is to learn the latent-space transitions the scene undergoes given <em>any</em> action, because at inference the planner will propose dozens of candidate actions per decision, including bad ones, and the model has to predict what all of them would do in order to rank them. Train only on clean, goal-directed trajectories and the model never learns what a <em>bad</em> action looks like, so it can't tell the planner which candidates to reject. So I drove to cover the space, not to accomplish anything. My driving trajectories included: arcs and curves, pure forward runs, pure rotations both directions, the occasional stationary pause as a clean identity anchor where the action is exactly <code>(0, 0)</code>. The environment was a subsection of my room, roughly 2 m × 5 m carpeted area, blinds closed and room lights on for stable illumination, furniture left in fixed positions as landmarks. I intentionally kept conditions consistent across episodes, while varying the positions and headings for each new run. Driving was kept to entirely forward motion without any reverse commands. This becomes important later on when constructing the navigation graph.</p>
+<p>The resulting dataset is <strong>50 teleoperated episodes, 44,926 frames at 30 Hz</strong>, available on HuggingFace at <a href="https://huggingface.co/datasets/kaushikpraka/wm-smallarea_merged">kaushikpraka/wm-smallarea_merged</a> and viewable in the <a href="https://huggingface.co/spaces/lerobot/visualize_dataset">LeRobot visualizer</a>. It covers a roughly 2 m × 5 m carpeted area with blinds closed and room lights on for consistent illumination, furniture in fixed positions as landmarks. Trajectories included arcs, pure forward runs, rotations in both directions, and occasional stationary pauses as identity anchors where the action is exactly <code>(0, 0)</code>. I varied start positions and headings across episodes while keeping environmental conditions stable, and drove only forward with no reverse commands. That last choice matters later when building the navigation graph.</p>
 
 <figure>
   <img src="assets/world_trajectories.png" alt="">
-  <figcaption><b>A sample of the driving.</b> Dead-reckoned paths from a handful of the 50 tele-operated episodes — a glimpse of the exploratory driving that makes up the ~25-minute dataset, all in one section of a room.</figcaption>
+  <figcaption><b>A sample of the driving.</b> Dead-reckoned paths from a handful of the 50 teleoperated episodes, showing the exploratory coverage that makes up the ~25-minute dataset.</figcaption>
 </figure>
 
-<h3>The action space: dead reckoning</h3>
+<h3>Dead reckoning the action space</h3>
 
-<p>The robot is controlled with two floats: forward velocity and yaw rate. But I don't hand those to the model directly. Instead I <strong>dead-reckon</strong>: integrate each short window of about five control steps (~167 ms) into a single body-frame pose change, a displacement <strong>(Δx, Δθ)</strong> chunk. Some advantages of this representation:</p>
+<p>The robot is controlled with two floats, forward velocity and yaw rate, but I don't hand those directly to the model. Instead I <strong>dead-reckon</strong> them, integrating each short window of about five control steps (~167 ms) into a single body-frame pose change, a displacement <strong>(Δx, Δθ)</strong> chunk. This representation has a few key advantages.</p>
 
 <ul>
-  <li>It's a <strong>body-frame</strong> displacement, so "drive forward 5 cm" is the same vector <code>(0.05, 0)</code> no matter which way the robot is facing, providing the model with heading invariance instead of having to learn it.</li>
-  <li>It's <strong>low-dimensional</strong>, keeping planner's search small.</li>
-  <li>It's an <strong>integrated displacement, not a raw velocity</strong>.</li>
+  <li>It's a <strong>body-frame</strong> displacement, so "drive forward 5 cm" is the same vector <code>(0.05, 0)</code> no matter which way the robot is facing, giving the model heading invariance rather than requiring it to learn it.</li>
+  <li>It's <strong>low-dimensional</strong>, keeping the planner's search small.</li>
+  <li>It's an <strong>integrated displacement, not a raw velocity</strong>. During steady cruising the velocity is constant for many frames while the image keeps changing, so a model trained on velocities learns the action is uninformative and quietly stops listening. A displacement is nonzero exactly when the robot moves and scales with how far, so it stays coupled to what the camera sees.</li>
 </ul>
 
-<p>During steady cruising the velocity is constant for many frames while the image keeps changing, so a model trained on velocities learns the action is uninformative and quietly stops listening to it. A displacement is nonzero exactly when the robot moves and scales with how far, so it stays coupled to what the camera sees.</p>
-
-<p>Dead reckoning has one assumption baked in: <strong>no significant slip</strong>, that a commanded centimeter is a real centimeter across the floor. For a light, slow robot on flat carpet that holds well enough. Since the planner re-observes a fresh frame every chunk, any small error is corrected rather than accumulated. The rest I checked empirically: the dropped Δy never exceeds ~0.58 mm, and an open-loop replay on the real robot traced the dead-reckoned path to ~0 cm even through a 117° arc.</p>
+<p>Dead reckoning assumes <strong>no significant slip</strong>, meaning a commanded centimeter is a real centimeter across the floor. For a light, slow robot on flat carpet that holds well enough. Since the planner re-observes a fresh frame every chunk, any small accumulated error is corrected rather than compounded. The dropped Δy never exceeds ~0.58 mm, and an open-loop replay on the real robot traced the dead-reckoned path to ~0 cm even through a 117° arc.</p>
 
 <figure>
   <img src="assets/chunk_deltas.png" alt="">
-  <figcaption><b>The action distribution per chunk, dead-reckoned from the raw logs.</b> Forward motion is nearly bang-bang — stopped or full speed — and the per-chunk reach is short (~1.65 cm). The lateral drift Δy that I drop sits in the sub-millimeter range.</figcaption>
+  <figcaption><b>The action distribution per chunk, dead-reckoned from the raw logs.</b> Forward motion is nearly bang-bang, stopped or full speed, and the per-chunk reach is short (~1.65 cm). The lateral drift Δy that I drop sits in the sub-millimeter range.</figcaption>
 </figure>
 
 <h2 id="the-world-model">4 · The World Model</h2>
