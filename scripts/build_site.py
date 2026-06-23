@@ -102,30 +102,6 @@ SCRIPT = """<script>
   update();
 })();
 
-// Synced video pairs — play/pause/seek one side, the other follows
-(function () {
-  document.querySelectorAll('.video-pair').forEach(function (pair) {
-    var g = pair.getAttribute('data-sync-group');
-    var a = document.getElementById('vp-' + g + '-a');
-    var b = document.getElementById('vp-' + g + '-b');
-    if (!a || !b) return;
-    var busy = false;
-    function mirror(src, dst) {
-      return function () {
-        if (busy) return;
-        busy = true;
-        dst.currentTime = src.currentTime;
-        if (src.paused) dst.pause(); else dst.play().catch(function () {});
-        busy = false;
-      };
-    }
-    ['play', 'pause', 'seeked'].forEach(function (evt) {
-      a.addEventListener(evt, mirror(a, b));
-      b.addEventListener(evt, mirror(b, a));
-    });
-  });
-})();
-
 // Theme toggle — cycles cream → gray → dark, persists via localStorage
 (function () {
   var themes = ['cream', 'gray', 'slate', 'dark'];
