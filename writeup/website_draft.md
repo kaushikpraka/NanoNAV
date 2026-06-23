@@ -216,6 +216,9 @@ On the robot, the retrained model drove the DINOv2 cosine distance to goal down 
 
 DINOv2 tokens are not directly human-readable, so to watch the model think, I trained a small **token-to-RGB decoder** separately to map predicted token grids back to approximate pixel frames. The planner itself never uses it, scoring entirely in token space, and the decoder exists purely for visualization.
 
+[FIGURE: ✅ assets/c1_smoke_strip.png]
+*Imagining in semantic space. The world model predicts DINOv2 tokens, and a small decoder renders them back to pixels for visualization. The planner scores in token space and never decodes.*
+
 The retrain also answered the Run 001 question. Switching the prediction target from VAE latents to DINOv2 tokens meant training from scratch, which opened a clean opportunity to probe what had actually caused the dead action. Run 001 used VAE latents with additive injection, leaving two explanations open. Either the VAE representation was too weak for action conditioning to matter, or the additive injection method was too easy to ignore regardless of representation. Running both injection methods against the same semantic latents settled it. The dead action was not an inherent incompatibility with semantic latents, but a problem with the injection method.
 
 **Additive injection** adds the action embedding as a residual to each transformer layer. The model can neutralize that influence by learning to make the residual contribution small. With a strong semantic signal already dominating the latents, that is exactly what happened, and the action embedding RMS atrophied to 0.0028.
@@ -225,9 +228,6 @@ The retrain also answered the Run 001 question. Switching the prediction target 
 $$\text{output} = \gamma(\mathbf{a}) \cdot \text{LayerNorm}(x) + \beta(\mathbf{a})$$
 
 Because the action now multiplicatively controls the scale of the entire feature map at every layer, the model cannot reduce its influence by tuning a weight toward zero. On the same semantic latents where additive injection collapsed to 0.0028 RMS, AdaLN held at 0.2 RMS.
-
-[FIGURE: ✅ assets/c1_smoke_strip.png]
-*Imagining in semantic space. The world model predicts DINOv2 tokens, and a small decoder renders them back to pixels for visualization. The planner scores in token space and never decodes.*
 
 [FIGURE: ✅ assets/dinov2_planner_demo.mp4 controls — on-robot demo of the DINOv2 flat planner reaching a nearby goal]
 *The flat planner, no graph. Goal within ~40 cm, DINOv2 metric descending, robot converging. This is the range limit the graph is built to solve.*
