@@ -261,11 +261,8 @@ Both the weld threshold and the waypoint spacing are calibrated from data. I set
 
 Without the graph, the flat planner succeeds from a DINOv2 cosine start distance of 0.35 but wanders from 0.45. The graph crosses exactly that threshold.
 
-[FIGURE: ✅ assets/plan-demo.mp4 controls — graph-guided MPC run: the planner routes through waypoints to reach the hamper goal]
-*The full system running on the robot. The planner localizes in the graph, builds a waypoint route, and drives to the goal through a sequence of short CEM-planned hops.*
-
-[FIGURE: ✅ assets/topdown_graph_hamper.mp4 — overhead view of a successful graph-guided run to the hamper, compressed ~83×]
-*Top-down view of the same run. The robot's path traces the graph route from start to goal, sped up roughly 83× from the original 15-minute recording.*
+[FIGURE_PAIR: ✅ assets/plan-demo.mp4 | assets/topdown_graph_hamper.mp4 — synced planner view and overhead camera for a successful graph-guided run to the hamper]
+*Planner visualization (left) and overhead camera (right), synchronized. The planner routes through waypoints and drives to the goal. The overhead recording is compressed roughly 83× from the original 15-minute run.*
 
 ---
 

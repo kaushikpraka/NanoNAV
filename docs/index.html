@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>NanoNAV — real-robot navigation with Nano World Models</title>
 <meta name="description" content="Latent-space planning with a Nano World Model drives a LeKiwi robot to goal images — learned from 25 minutes of driving, no maps, no depth, no pose.">
-<link rel="stylesheet" href="style.css?v=1782254999">
+<link rel="stylesheet" href="style.css?v=1782255310">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
 </head>
 <body>
@@ -283,13 +283,11 @@
 <p>Without the graph, the flat planner succeeds from a DINOv2 cosine start distance of 0.35 but wanders from 0.45. The graph crosses exactly that threshold.</p>
 
 <figure>
-  <video src="assets/plan-demo.mp4" controls loop muted playsinline></video>
-  <figcaption><b>The full system running on the robot.</b> The planner localizes in the graph, builds a waypoint route, and drives to the goal through a sequence of short CEM-planned hops.</figcaption>
-</figure>
-
-<figure>
-  <video src="assets/topdown_graph_hamper.mp4" autoplay loop muted playsinline></video>
-  <figcaption><b>Top-down view of the same run.</b> The robot's path traces the graph route from start to goal, sped up roughly 83× from the original 15-minute recording.</figcaption>
+  <div class="video-pair" data-sync-group="0">
+    <video id="vp-0-a" src="assets/plan-demo.mp4" controls loop muted playsinline></video>
+    <video id="vp-0-b" src="assets/topdown_graph_hamper.mp4" controls loop muted playsinline></video>
+  </div>
+  <figcaption><b>Planner visualization (left) and overhead camera (right), synchronized.</b> The planner routes through waypoints and drives to the goal. The overhead recording is compressed roughly 83× from the original 15-minute run.</figcaption>
 </figure>
 
 <h2 id="limitations">6 · Limitations</h2>
@@ -367,6 +365,30 @@
   window.addEventListener('scroll', onScroll, { passive: true });
   window.addEventListener('resize', onScroll, { passive: true });
   update();
+})();
+
+// Synced video pairs — play/pause/seek one side, the other follows
+(function () {
+  document.querySelectorAll('.video-pair').forEach(function (pair) {
+    var g = pair.getAttribute('data-sync-group');
+    var a = document.getElementById('vp-' + g + '-a');
+    var b = document.getElementById('vp-' + g + '-b');
+    if (!a || !b) return;
+    var busy = false;
+    function mirror(src, dst) {
+      return function () {
+        if (busy) return;
+        busy = true;
+        dst.currentTime = src.currentTime;
+        if (src.paused) dst.pause(); else dst.play().catch(function () {});
+        busy = false;
+      };
+    }
+    ['play', 'pause', 'seeked'].forEach(function (evt) {
+      a.addEventListener(evt, mirror(a, b));
+      b.addEventListener(evt, mirror(b, a));
+    });
+  });
 })();
 
 // Theme toggle — cycles cream → gray → dark, persists via localStorage

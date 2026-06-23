@@ -217,6 +217,11 @@ figcaption b { color: var(--text); }
 .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 0.6rem; }
 @media (max-width: 600px) { .row2 { grid-template-columns: 1fr; } }
 
+/* synced video pair */
+.video-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 0.6rem; }
+.video-pair video { width: 100%; height: auto; display: block; }
+@media (max-width: 600px) { .video-pair { grid-template-columns: 1fr; } }
+
 /* ---- hero video ---- */
 .hero {
   width: min(58rem, calc(100vw - 2.5rem));

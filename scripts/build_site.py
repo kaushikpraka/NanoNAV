@@ -37,6 +37,7 @@ OUT = os.path.join(ROOT, "docs", "index.html")
 ASSETS_DIR = os.path.join(ROOT, "docs", "assets")
 
 MEDIA_RE = re.compile(r"[\w./-]+\.(?:png|jpe?g|gif|svg|mp4|webm)", re.I)
+_pair_counter = [0]
 
 
 def slugify(s):
@@ -99,6 +100,30 @@ SCRIPT = """<script>
   window.addEventListener('scroll', onScroll, { passive: true });
   window.addEventListener('resize', onScroll, { passive: true });
   update();
+})();
+
+// Synced video pairs — play/pause/seek one side, the other follows
+(function () {
+  document.querySelectorAll('.video-pair').forEach(function (pair) {
+    var g = pair.getAttribute('data-sync-group');
+    var a = document.getElementById('vp-' + g + '-a');
+    var b = document.getElementById('vp-' + g + '-b');
+    if (!a || !b) return;
+    var busy = false;
+    function mirror(src, dst) {
+      return function () {
+        if (busy) return;
+        busy = true;
+        dst.currentTime = src.currentTime;
+        if (src.paused) dst.pause(); else dst.play().catch(function () {});
+        busy = false;
+      };
+    }
+    ['play', 'pause', 'seeked'].forEach(function (evt) {
+      a.addEventListener(evt, mirror(a, b));
+      b.addEventListener(evt, mirror(b, a));
+    });
+  });
 })();
 
 // Theme toggle — cycles cream → gray → dark, persists via localStorage
@@ -222,6 +247,36 @@ def render_figure(marker, caption):
     return "<figure%s>%s\n  %s\n</figure>" % (cls, inner, cap)
 
 
+def render_figure_pair(marker, caption):
+    """Render two synced side-by-side videos for [FIGURE_PAIR: a.mp4 | b.mp4 ...]."""
+    paths = MEDIA_RE.findall(marker)
+    if len(paths) < 2:
+        return '<div class="pending"><b>Pending figure pair.</b> %s</div>' % inline(marker)
+    bases = [os.path.basename(p) for p in paths[:2]]
+    missing = [b for b in bases if not os.path.exists(os.path.join(ASSETS_DIR, b))]
+    if missing:
+        desc = re.sub(r"^\[FIGURE_PAIR:\s*", "", marker).rstrip("]")
+        return '<div class="pending"><b>Pending figure pair.</b> %s</div>' % inline(desc)
+
+    gid = _pair_counter[0]
+    _pair_counter[0] += 1
+    attrs = "controls loop muted playsinline"
+
+    cap = caption_html(caption) if caption else ""
+    videos = "\n    ".join(
+        '<video id="vp-%d-%s" src="assets/%s" %s></video>' % (gid, side, b, attrs)
+        for side, b in zip(("a", "b"), bases)
+    )
+    return (
+        '<figure>\n'
+        '  <div class="video-pair" data-sync-group="%d">\n'
+        '    %s\n'
+        '  </div>\n'
+        '  %s\n'
+        '</figure>' % (gid, videos, cap)
+    )
+
+
 # --------------------------------------------------------------------- tables
 def split_cells(line):
     return [c.strip() for c in line.strip().strip("|").split("|")]
@@ -267,6 +322,16 @@ def render_body(text, is_last_section):
             continue
         if first.startswith("### "):
             out.append("<h3>%s</h3>" % inline(first[4:]))
+        elif first.startswith("[FIGURE_PAIR"):
+            caption = None
+            if len(lines) > 1 and lines[1].strip().startswith("*"):
+                caption = lines[1].strip()
+            elif i + 1 < len(blocks):
+                nb = blocks[i + 1].strip()
+                if nb.startswith("*") and nb.endswith("*") and "\n" not in nb:
+                    caption = nb
+                    i += 1
+            out.append(render_figure_pair(first, caption))
         elif first.startswith("[FIGURE"):
             caption = None
             if len(lines) > 1 and lines[1].strip().startswith("*"):
