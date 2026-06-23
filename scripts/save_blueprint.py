@@ -8,7 +8,7 @@ Usage:
     python3 scripts/save_blueprint.py --no-graph            # flat-planner layout (no route strip)
 
 Then open a recording with it:
-    rerun --blueprint viewer_blueprint.rbl live_run2.rrd
+    rerun viewer_blueprint.rbl live_run2.rrd
 """
 import argparse
 import rerun as rr
@@ -63,7 +63,6 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     bp = build_blueprint(graph_mode=not args.no_graph, horizon=args.horizon, flat=args.flat)
-    rr.init("nanonav_blueprint")
-    bp.save(args.out)
+    bp.save("nanonav_lekiwi_mpc", path=args.out)
     print(f"saved {args.out}")
-    print(f"open with:  rerun --blueprint {args.out} <recording.rrd>")
+    print(f"open with:  rerun {args.out} <recording.rrd>")
