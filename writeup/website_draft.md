@@ -29,7 +29,7 @@
 
 ## TL;DR
 
-I taught a [**LeKiwi**](https://github.com/SIGRobotics-UIUC/LeKiwi) mobile manipulator to drive to a **photograph**. Show it an image taken somewhere in the room and it finds its way there, using a stack learned entirely from **50 teleoperated episodes (~25 minutes, ~45K frames)** through a single overhead camera. A diffusion world model imagines candidate futures, a sampling-based planner picks the actions whose imagined outcome looks most like the goal, and a 4,500-node graph of moments from the training data carries the robot to goals beyond the model's local horizon. No metric map, no depth sensor, no external localization.
+I taught a [**LeKiwi**](https://github.com/SIGRobotics-UIUC/LeKiwi) mobile manipulator to drive to a **photograph**. Show it an image taken somewhere in the room and it finds its way there, using a stack learned entirely through an overhead camera and ~50 teleoperated episodes. A diffusion world model imagines candidate futures, a sampling-based planner picks the actions whose imagined outcome looks most like the goal, and a 4,500-node graph of moments from the training data carries the robot to goals beyond the model's local horizon. No metric map, no depth sensor, no external localization.
 
 ---
 

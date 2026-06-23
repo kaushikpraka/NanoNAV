@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>NanoNAV — real-robot navigation with Nano World Models</title>
 <meta name="description" content="Latent-space planning with a Nano World Model drives a LeKiwi robot to goal images — learned from 25 minutes of driving, no maps, no depth, no pose.">
-<link rel="stylesheet" href="style.css?v=1782245102">
+<link rel="stylesheet" href="style.css?v=1782245183">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
 </head>
 <body>
@@ -26,7 +26,7 @@
 
 <div class="tldr">
   <span class="label">TL;DR</span>
-  I taught a <a href="https://github.com/SIGRobotics-UIUC/LeKiwi"><strong>LeKiwi</strong></a> mobile manipulator to drive to a <strong>photograph</strong>. Show it an image taken somewhere in the room and it finds its way there, using a stack learned entirely from <strong>50 teleoperated episodes (~25 minutes, ~45K frames)</strong> through a single overhead camera. A diffusion world model imagines candidate futures, a sampling-based planner picks the actions whose imagined outcome looks most like the goal, and a 4,500-node graph of moments from the training data carries the robot to goals beyond the model's local horizon. No metric map, no depth sensor, no external localization.
+  I taught a <a href="https://github.com/SIGRobotics-UIUC/LeKiwi"><strong>LeKiwi</strong></a> mobile manipulator to drive to a <strong>photograph</strong>. Show it an image taken somewhere in the room and it finds its way there, using a stack learned entirely through an overhead camera and ~50 teleoperated episodes. A diffusion world model imagines candidate futures, a sampling-based planner picks the actions whose imagined outcome looks most like the goal, and a 4,500-node graph of moments from the training data carries the robot to goals beyond the model's local horizon. No metric map, no depth sensor, no external localization.
 </div>
 
 <nav class="toc">
