@@ -12,10 +12,29 @@ Sections are reviewed and cleaned one at a time, in document order:
 2. Problem Statement — done
 3. Robot Hardware — done
 4. Data — done
-5. The World Model — in progress
-6. Road to a working planner — pending
+5. The World Model — done
+6. Road to a working planner — done
+   - Planning: MPC + CEM in latent space — done
+   - Inference setup — done
+   - Run 001 — done
+   - Does translation exist in the latent? — done
+   - Run 002 — done
+   - First closed-loop run — done (TODO: wire in goal image, start position, video from goals/run1/)
+   - The semantic pivot — done
+   - Building a waypoint graph — done
+   - Three failures on the way to the first graph success — done
 7. Limitations — done
 8. What comes next — done
+
+## Outstanding asset placeholders
+
+- `goals/run1/goal.png` — wire into First closed-loop run section
+- `⏳ assets/dinov2_planner_demo.mp4` — short clip of DINOv2 flat planner working on robot
+- `⏳ assets/subgoal-graph-anim.mp4` — graph build/route animation
+- `⏳ on-robot success capture` — nearpurifier run trace or screen recording
+- `⏳ additional on-robot success run videos`
+- `🆕 assets/ps5-controller.jpg` — photo of DualSense controller
+- TL;DR — not formally reviewed against style rules
 
 ## Prose style rules
 
