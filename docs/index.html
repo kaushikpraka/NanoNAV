@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>NanoNAV — real-robot navigation with Nano World Models</title>
 <meta name="description" content="Latent-space planning with a Nano World Model drives a LeKiwi robot to goal images — learned from 25 minutes of driving, no maps, no depth, no pose.">
-<link rel="stylesheet" href="style.css?v=1782319868">
+<link rel="stylesheet" href="style.css?v=1782342075">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
 </head>
 <body>
@@ -115,7 +115,7 @@
 
 <h2 id="the-world-model">4 · The World Model</h2>
 
-<p>The world model I used is <strong>NanoWM</strong>, a ~160M-parameter diffusion-forcing transformer that works not in pixels but in a compressed <em>latent</em> space produced by a frozen Stable-Diffusion VAE. Given a few context frames and a candidate action chunk, it predicts a latent future frame, and stacking those predictions gives a <em>rollout</em>, a short imagined sequence of what latent driving would look like.</p>
+<p>The world model I used is <strong>NanoWM</strong>, a ~160M-parameter diffusion-forcing transformer that works not in pixels but in a compressed <em>latent</em> space produced by a frozen Stable-Diffusion VAE. Given a few context frames and a candidate action chunk, it predicts a latent future frame, and stacking those predictions gives a <em>rollout</em>, a short imagined sequence of what latent driving would look like. This puts it in the tradition Yann LeCun has championed with <a href="https://openreview.net/pdf?id=BZ5a1r-kVsf"><strong>JEPA</strong></a>: predict in an abstract representation space rather than in pixel space, so the model learns to anticipate what is semantically meaningful and ignores the texture, lighting, and noise detail it cannot control.</p>
 
 <p>One critical knob is the <strong>frame interval</strong>, the temporal stride between the frames the model is trained to connect. If it is too short, each step barely moves the scene and the action signal drowns in noise, while if it is too long, the prediction itself becomes hard. I return to this parameter in the next section.</p>
 
@@ -313,27 +313,29 @@
   <figcaption><b>Planner visualization (left) and overhead camera (right), synchronized.</b> The planner routes through waypoints and drives to the goal. The overhead recording is compressed roughly 83× from the original 15-minute run.</figcaption>
 </figure>
 
-<p>**Should acknowledge here that building a waypoint graph is similar to a classical robotics approach</p>
+<p>It is worth acknowledging that a topological graph of training frames is not a fundamentally new idea. Classical topological navigation has used similar structures for decades. What is different here is that the nodes are real camera observations from unstructured teleoperation, the edges are detected by a learned visual similarity metric rather than hand-placed, and the local step between waypoints is solved by a learned world model rather than a geometric controller. The graph does not replace the learning; it extends the range over which the learned planner can operate.</p>
 
 <h2 id="reflection">6 · Reflection</h2>
 
-<p>My goal with this project was never to build the most capable navigation system. It was to find out whether a small world model trained in a constrained environment can do meaningful planning at all. That question now has a clear answer. The system is entirely bounded by the data it was trained on, though. The graph, the world model, and the distance metric all assume the robot is operating in the same room it drove through during collection. What happens outside that distribution is an open question worth testing systematically.</p>
+<p>My goal with this project was never to build the most capable navigation system. It was to find out whether a small world model trained in a constrained environment can do meaningful planning at all. That question now has a clear answer, though a few constraints and open directions are worth naming.</p>
 
-<p>The navigation also is not precise in the way GPS-guided systems are. The robot reaches the goal area reliably, but the final pose can be offset in both translation and rotation, which is most visible in the third no-graph demo where the robot converges to a recognizably correct location that does not pixel-match the goal image. For tasks requiring a precise final pose, a visual-servo step that can strafe and reverse would close that gap more reliably than asking CEM to solve a millimeter-level docking problem.</p>
+<p><strong>Bounded by training data.</strong> The graph, world model, and distance metric all assume the robot is in the same room it drove through during collection. DINOv2 embeddings will generalize to new environments, but whether the learned action-to-latent dynamics transfer is an open question worth testing.</p>
 
-<p>Inference speed is the other immediate friction point. The current loop runs at roughly one plan every 7 seconds, which makes motion feel more like teleportation than driving. The bottleneck is running diffusion across all the CEM candidate rollouts, and there is meaningful room to compress it through fewer denoising steps, model distillation, or more aggressive rollout batching. Bringing the loop under a second would change the character of the navigation entirely.</p>
+<p><strong>Navigational precision.</strong> The robot reliably reaches the goal area, but the final pose can be offset in translation and rotation, most visibly in the third no-graph demo where the robot converges to the right location but does not pixel-match the goal. A visual-servo step that can strafe and reverse would close that gap more reliably than asking CEM to solve a millimeter-level docking problem.</p>
 
-<p>Most of the remaining constraints open up with more data and more coverage. The dataset was collected with forward and turning motion only, so the graph has no backward edges and the world model has never seen a strafe command. Adding reverse driving and strafing to the collection protocol would expand what the planner can express without changing the architecture. More camera views, whether additional angles or a wider field, would give the distance metric more signal and help localization in areas where the single overhead angle is ambiguous. And the LeKiwi has a full manipulator arm that spent this entire project parked and unused. Extending the task to drive-and-manipulate is the natural next step once the navigation layer is solid enough to hand off reliably to a manipulation policy.</p>
+<p><strong>CEM cold-starting.</strong> Each plan samples fresh from a Gaussian and refits over a few iterations. Warm-starting from the previous plan's mean and variance would reduce iterations to convergence and speed up the overall loop.</p>
 
-<p>The lessons, each earned above:</p>
+<p><strong>Inference speed.</strong> The loop runs at roughly one plan every 7 seconds, running 64-step DDIM denoising across all CEM candidate rollouts. Fewer denoising steps, model distillation, or more aggressive rollout batching could all compress this significantly. Getting under a second would change the character of the navigation entirely.</p>
 
-<ul>
-  <li><strong>The objective is part of the planner.</strong> The search was never broken; the metric was blind.</li>
-  <li><strong>Make the bottleneck a number before you change the architecture.</strong> One afternoon with a tape measure redirected the whole project.</li>
-  <li><strong>Judge a world model by its rollouts, not its validation loss.</strong></li>
-  <li><strong>Topology is cheaper than capability.</strong> A graph fixed what no planning knob could.</li>
-  <li><strong>Your map encodes your robot's physics.</strong> No reverse means a directed graph.</li>
-</ul>
+<p><strong>Single camera.</strong> The LeKiwi has three cameras but this project used only the overhead one. Additional views would give the distance metric more signal and help localization in areas where the single overhead angle is ambiguous, though at the cost of higher inference time.</p>
+
+<p><strong>Two-dimensional action space.</strong> Data was collected with forward and turn commands only, so the planner cannot strafe and the graph has no backward edges. Adding y-velocity and reverse would expand what the planner can express, though it would require proportionally more diverse coverage to fill the larger action space.</p>
+
+<p><strong>Distance metric.</strong> DINOv2 cosine is a strong starting point for goal-reaching but is purely appearance-based, with no concept of obstacles or preferred routes. Extending it toward a metric that penalizes passing through specific regions would make the planner more useful in cluttered environments without requiring a separate collision map.</p>
+
+<p><strong>Manipulator integration.</strong> The arm spent this entire project parked and unused. One natural extension is to drive to a pickup location and hand off to a manipulation policy from there, using the navigation layer to solve the getting-there problem and a separate policy for grasping. Another could be to absorb both navigation and manipulation into the world model.</p>
+
+<p>It was very rewarding to visually see the LeCun style of World Model planning come to life on real-hardware in my own apartment. I look forward to expanding on this project and exploring what is possible with World Models without needing frontier levels of compute or data. Would love to chat more with anyone working on World Models/Robot Learning. Feel free to reach out on <a href="https://www.linkedin.com/in/kaushik-prakash-7ab477162/"><strong>LinkedIn</strong></a>.</p>
 
 <hr>
 <p><em>Code coming soon. Built on <a href="https://github.com/huggingface/lerobot">LeRobot</a> (LeKiwi), <a href="https://arxiv.org/abs/2605.23993">Nano World Models</a>, and frozen <a href="https://github.com/facebookresearch/dinov2">DINOv2</a> features.</em></p>
