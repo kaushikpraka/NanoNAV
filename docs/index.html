@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>NanoNAV — real-robot navigation with Nano World Models</title>
 <meta name="description" content="Latent-space planning with a Nano World Model drives a LeKiwi robot to goal images — learned from 25 minutes of driving, no maps, no depth, no pose.">
-<link rel="stylesheet" href="style.css?v=1782269085">
+<link rel="stylesheet" href="style.css?v=1782269770">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
 </head>
 <body>
@@ -311,17 +311,17 @@
   <figcaption><b>Planner visualization (left) and overhead camera (right), synchronized.</b> The planner routes through waypoints and drives to the goal. The overhead recording is compressed roughly 83× from the original 15-minute run.</figcaption>
 </figure>
 
+<p>**Should acknowledge here that building a waypoint graph is similar to a classical robotics approach</p>
+
 <h2 id="limitations-and-what-comes-next">6 · Limitations and what comes next</h2>
 
-<p>The scope here is deliberately narrow, and that narrowness is a tradeoff worth naming. The system covers one corner of one room through a single overhead camera, with goals drawn from the same space the robot drove through. Navigation is stop-and-plan, meaning the robot pauses roughly 7 seconds between moves rather than driving continuously, and the graph covers exactly the ground the training data crossed. These bounds were chosen, not stumbled into. The question this project set out to answer did not require a general solution, and trying to build one would have buried the interesting parts under engineering scaffolding.</p>
+<p>The goal here was never to build the most capable navigation system. It was to find out whether a small world model trained in a constrained environment can do meaningful planning at all. That question now has a clean answer, but it comes with a clear boundary: the system is entirely bounded by the data it was trained on. The graph, the world model, and the distance metric all assume the robot is operating in the same room it drove through during collection. What happens outside that distribution is an open question worth testing systematically.</p>
 
-<p>None of the algorithms here are original, and that too is intentional. The graph is a form of teach-and-repeat, where nodes are training frames, localization is nearest-neighbor lookup, and routes replay stitched segments of prior drives. The distance metric is frozen DINOv2 cosine similarity, which is DINO-WM. The experience graph mirrors ViNG. The planner is textbook sampling MPC. Using proven building blocks was a choice, not a shortcut, because the interesting question was never whether a new algorithm could navigate a room. It was whether these specific pieces could be combined and tuned to work reliably together on real hardware from 25 minutes of data. The difficulty was in the integration, and that is where all the effort went.</p>
+<p>The navigation also is not precise in the way GPS-guided systems are. The robot reaches the goal area reliably, but the final pose can be offset in both translation and rotation, which is most visible in the third no-graph demo where the robot converges to a recognizably correct location that does not pixel-match the goal image. For tasks requiring a precise final pose, a visual-servo step that can strafe and reverse would close that gap more reliably than asking CEM to solve a millimeter-level docking problem.</p>
 
-<p>Most of these constraints have natural paths forward within the same architecture. Coverage is the most immediate one: more trajectories add nodes and edges without changing anything else. Multiple cameras would widen the field of view, and reverse driving would add backward edges without retraining. A visual-servo final approach that can strafe and reverse, bypassing the world model for the last few centimeters, would be more reliable than asking CEM to solve a precision docking problem. Faster inference, from roughly 7 seconds toward 1 second per step, would make motion continuous rather than hop-by-hop.</p>
+<p>Inference speed is the other immediate friction point. The current loop runs at roughly one plan every 7 seconds, which makes motion feel more like teleportation than driving. The bottleneck is running diffusion across all the CEM candidate rollouts, and there is meaningful room to compress it through fewer denoising steps, model distillation, or more aggressive rollout batching. Bringing the loop under a second would change the character of the navigation entirely.</p>
 
-<p>The broader architecture already has a natural three-layer shape. A graph handles topological memory and long-range routing. CEM and the world model handle local planning across roughly 40 cm of horizon. A visual-servo endgame handles the final approach. Each layer keeps the next one inside its comfort zone.</p>
-
-<p>What 25 minutes of driving produced: a robot that navigates to a photograph across a room it has never explicitly mapped, using a world model small enough to train overnight, a distance metric requiring no additional training, and a graph built offline in minutes.</p>
+<p>Most of the remaining constraints open up with more data and more coverage. The dataset was collected with forward and turning motion only, so the graph has no backward edges and the world model has never seen a strafe command. Adding reverse driving and strafing to the collection protocol would expand what the planner can express without changing the architecture. More camera views, whether additional angles or a wider field, would give the distance metric more signal and help localization in areas where the single overhead angle is ambiguous. And the LeKiwi has a full manipulator arm that spent this entire project parked and unused. Extending the task to drive-and-manipulate is the natural next step once the navigation layer is solid enough to hand off reliably to a manipulation policy.</p>
 
 <p>The lessons, each earned above:</p>
 
