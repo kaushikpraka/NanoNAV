@@ -70,7 +70,7 @@ That structure creates one important constraint: the distance metric used for pl
 
 The [**LeKiwi**](https://github.com/SIGRobotics-UIUC/LeKiwi) is an open-source mobile manipulator from UIUC and LeRobot, built around a low-cost SO-101 arm on a three-omniwheel kiwi drive base, driven by an onboard Raspberry Pi and inexpensive serial-bus servos. For navigation I use only the base, with the arm parked in a fixed pose throughout. The Pi stays light on the robot side, streaming camera frames and accepting velocity commands over the network while the world model itself runs on a rented cloud GPU connected through an SSH tunnel.
 
-The stock LeKiwi uses a low front-facing webcam, which I replaced with wider-angle USB cameras and supplemented with a [third overhead camera](https://www.amazon.com/dp/B0C289GYVZ?ref=ppx_yo2ov_dt_b_product_details&th=1) on a custom mount, angled down at roughly 55°. That overhead vantage is what everything downstream depends on, capturing the scene across four depth zones at once, from the robot's own body and the near floor out to the mid-room objects and far walls.
+The stock LeKiwi uses a low front-facing webcam and a gripper webcam. I replaced all three with wider-angle USB cameras and supplemented with a [third overhead camera](https://www.amazon.com/dp/B0C289GYVZ?ref=ppx_yo2ov_dt_b_product_details&th=1) on a custom mount, angled down at roughly 55°. That overhead vantage is what everything downstream depends on, capturing the scene across four depth zones at once, from the robot's own body and the near floor out to the mid-room objects and far walls.
 
 *Hardware at a glance: LeKiwi (LeRobot) · holonomic 3-omniwheel base · SO-ARM arm, parked · Raspberry Pi host · low-cost serial-bus servos · overhead USB camera on a custom ~55° mount. [TODO: confirm exact Pi model / servo model / camera model and how the mount was fabricated.]*
 
@@ -310,6 +310,8 @@ My goal with this project was never to build the most capable navigation system.
 **Distance metric.** DINOv2 cosine is a strong starting point for goal-reaching but is purely appearance-based, with no concept of obstacles or preferred routes. Extending it toward a metric that penalizes passing through specific regions would make the planner more useful in cluttered environments without requiring a separate collision map.
 
 **Manipulator integration.** The arm spent this entire project parked and unused. One natural extension is to drive to a pickup location and hand off to a manipulation policy from there, using the navigation layer to solve the getting-there problem and a separate policy for grasping. Another could be to absorb both navigation and manipulation into the world model.
+
+**Static environment.** The training data was collected with furniture fixed and no dynamic obstacles, which helped the model focus on learning the robot's own dynamics but leaves open-world generalization untested. Covering more environmental variability, different lighting, rearranged furniture, moving objects, would be the natural next step for robustness.
 
 It was very rewarding to visually see the LeCun style of World Model planning come to life on real-hardware in my own apartment. I look forward to expanding on this project and exploring what is possible with World Models without needing frontier levels of compute or data. Would love to chat more with anyone working on World Models/Robot Learning. Feel free to reach out on [**LinkedIn**](https://www.linkedin.com/in/kaushik-prakash-7ab477162/).
 
