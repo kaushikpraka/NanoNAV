@@ -52,6 +52,16 @@ The bet here is that a world model trained on raw experience can replace all of 
 
 [TODO: optionally a one-line spec box here — camera, 2-D action (forward velocity + yaw rate), goal-as-photo.]
 
+### Latent space
+
+A camera frame is a grid of hundreds of thousands of pixels. Working directly in that space is expensive and fragile: two images of the same scene taken one step apart can differ in thousands of pixel values because of lighting flicker or compression artifacts, even though nothing meaningfully changed. A **Variational Autoencoder** (VAE) solves this by compressing each frame into a short vector called a **latent**, which captures the essential structure of the image while discarding that noise. Two frames of the same view produce nearby latents. Two frames of completely different places produce latents far apart.
+
+The compression here is dramatic, from a 480×640 RGB frame down to a [4×32×32] latent, roughly a 450× reduction. What comes out is not a human-readable description of the scene, but it is a structured, smooth space where arithmetic is meaningful. Shift the latent by a small amount and the decoded image changes by a small, semantically coherent amount.
+
+In this project the VAE is **frozen** and pretrained on Stable Diffusion's training data, so it never sees robot footage. It acts as a universal visual encoder that maps any camera frame to a latent. The world model is then trained entirely in this latent space: given recent latents and an action, predict the next latent. The planner searches for action sequences whose imagined latent endpoint looks closest to the goal's latent. Every step of the loop, from perception to imagination to scoring, happens in latent space, with raw pixels only entering and leaving at the very edges.
+
+That structure creates one important constraint: the distance metric used for planning has to be meaningful in the specific latent space the model predicts in. What looks like a useful distance measure globally can become nearly flat in the far field, making it impossible for the planner to tell whether a candidate action moved toward the goal. That failure mode ends up driving most of the work in §5.
+
 ---
 
 ## 2 · Robot Hardware
@@ -94,19 +104,7 @@ Dead reckoning assumes **no significant slip**, meaning a commanded centimeter i
 
 ---
 
-## 4 · Latent Space
-
-A camera frame is a grid of hundreds of thousands of pixels. Working directly in that space is expensive and fragile: two images of the same scene taken one step apart can differ in thousands of pixel values because of lighting flicker or compression artifacts, even though nothing meaningfully changed. A **Variational Autoencoder** (VAE) solves this by compressing each frame into a short vector called a **latent**, which captures the essential structure of the image while discarding that noise. Two frames of the same view produce nearby latents. Two frames of completely different places produce latents far apart.
-
-The compression here is dramatic, from a 480×640 RGB frame down to a [4×32×32] latent, roughly a 450× reduction. What comes out is not a human-readable description of the scene, but it is a structured, smooth space where arithmetic is meaningful. Shift the latent by a small amount and the decoded image changes by a small, semantically coherent amount.
-
-In this project the VAE is **frozen** and pretrained on Stable Diffusion's training data, so it never sees robot footage. It acts as a universal visual encoder that maps any camera frame to a latent. The world model is then trained entirely in this latent space: given recent latents and an action, predict the next latent. The planner searches for action sequences whose imagined latent endpoint looks closest to the goal's latent. Every step of the loop, from perception to imagination to scoring, happens in latent space, with raw pixels only entering and leaving at the very edges.
-
-That structure creates one important constraint: the distance metric used for planning has to be meaningful in the specific latent space the model predicts in. What looks like a useful distance measure globally can become nearly flat in the far field, making it impossible for the planner to tell whether a candidate action moved toward the goal. That failure mode ends up driving most of the work in the next section.
-
----
-
-## 5 · The World Model
+## 4 · The World Model
 
 The world model I used is **NanoWM**, a ~160M-parameter diffusion-forcing transformer that works not in pixels but in a compressed *latent* space produced by a frozen Stable-Diffusion VAE. Given a few context frames and a candidate action chunk, it predicts a latent future frame, and stacking those predictions gives a *rollout*, a short imagined sequence of what latent driving would look like.
 
@@ -121,7 +119,7 @@ Training uses [**Diffusion Forcing**](https://arxiv.org/abs/2407.01392) (Chen et
 
 ---
 
-## 6 · Road to Planning
+## 5 · Road to Planning
 
 Everything above is setup. What follows is the build log: each attempt, what broke, and what it taught.
 
