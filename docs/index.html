@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>NanoNAV — real-robot navigation with Nano World Models</title>
 <meta name="description" content="Latent-space planning with a Nano World Model drives a LeKiwi robot to goal images — learned from 25 minutes of driving, no maps, no depth, no pose.">
-<link rel="stylesheet" href="style.css?v=1782268896">
+<link rel="stylesheet" href="style.css?v=1782269085">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
 </head>
 <body>
@@ -264,6 +264,11 @@
 <figure>
   <video src="assets/nograph_nearfan.mp4" controls loop muted playsinline></video>
   <figcaption><b>Another flat-planner run, no graph.</b> The goal is close enough that DINOv2 cosine has a usable gradient and CEM converges without needing waypoints.</figcaption>
+</figure>
+
+<figure>
+  <video src="assets/nograph_nearchair.mp4" controls loop muted playsinline></video>
+  <figcaption>A third flat-planner run, no graph, different goal location near the chair.</figcaption>
 </figure>
 
 <h3>Building a waypoint graph</h3>

@@ -244,6 +244,9 @@ Because the action now multiplicatively controls the scale of the entire feature
 [FIGURE: ✅ assets/nograph_nearfan.mp4 controls — second no-graph demo: flat planner navigating to a nearby goal near the fan]
 *Another flat-planner run, no graph. The goal is close enough that DINOv2 cosine has a usable gradient and CEM converges without needing waypoints.*
 
+[FIGURE: ✅ assets/nograph_nearchair.mp4 controls — third no-graph demo: flat planner navigating to a nearby goal near the chair]
+*A third flat-planner run, no graph, different goal location near the chair.*
+
 ---
 
 ### Building a waypoint graph
