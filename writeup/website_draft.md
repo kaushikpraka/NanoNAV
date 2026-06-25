@@ -178,11 +178,12 @@ Retrained at f=10. The action branch came alive with clean **true < zero < rando
 
 ### First closed-loop run
 
-[TODO: add goal image, start position, and video of this run]
+[TODO: optional — add a photo of the robot's start position]
 
 The robot wandered. The VAE latent L2 distance-to-goal hovered around 45 (a raw latent distance, not centimetres) for 22 steps, with the yaw command flip-flopping every step. The world model rollouts looked reasonable and the planner was sampling correctly, which pointed the blame at the **distance metric** rather than either of them.
 
-NOTE: Try to find the rerun recording of this on runpod and include it here
+[FIGURE: ✅ assets/first_closedloop_vae.mp4]
+*The first closed-loop run, and the failure that drove the rest of the project. Live camera (left) against the goal image (right), with the SD-VAE latent distance-to-goal traced below. The robot is commanded forward and the yaw command flips sign step to step, yet the distance never moves: it hovers in the 44–46 band and then locks dead at 44.1. The metric is flat in the far field, so every candidate action looks equidistant from the goal and CEM has nothing to minimize. Recording: mpc_nearfan.rrd.*
 
 To check, I hand-placed the robot at measured distances from the goal, varied its yaw orientation at each position, and recorded the latents for three candidate metrics: pixel L1, SD-VAE latent L2, and frozen DINOv2 patch cosine. Each metric decreased monotonically with distance, which looked reassuring. What that test missed was the rate of decrease: in the far band the gradient was so shallow it was buried in the robot's own standing-still noise, so CEM could not distinguish one candidate action from another. That failure only became clear through the systematic sweep described in the next section.
 
