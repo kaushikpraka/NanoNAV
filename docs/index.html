@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>NanoNAV — real-robot navigation with Nano World Models</title>
 <meta name="description" content="Latent-space planning with a Nano World Model drives a LeKiwi robot to goal images — learned from 25 minutes of driving, no maps, no depth, no pose.">
-<link rel="stylesheet" href="style.css?v=1782361922">
+<link rel="stylesheet" href="style.css?v=1782362231">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
 </head>
 <body>
@@ -31,8 +31,8 @@
 
 <nav class="toc">
   <span class="label">Contents</span>
-  <p class="toc-intro"><a href="#background">Background — why I built this</a></p>
   <ol>
+    <li><a href="#background-why-i-built-this">Background — why I built this</a></li>
     <li><a href="#the-problem-statement">The Problem Statement</a></li>
     <li><a href="#robot-hardware">Robot Hardware</a></li>
     <li><a href="#data">Data</a></li>
@@ -42,7 +42,7 @@
   </ol>
 </nav>
 
-<h2 id="background">Background — why I built this</h2>
+<h2 id="background-why-i-built-this">1 · Background — why I built this</h2>
 
 <p>I've been fascinated by world model research lately. The field is a collection of competing bets on what the right output is, what the right training signal is, and where the real leverage lies. Dr. Fei-Fei Li describes the current landscape in <a href="https://www.worldlabs.ai/blog/taxonomy-of-world-models"><strong>A Functional Taxonomy of World Models</strong></a>. She organizes them by what they output. A <strong>Renderer</strong> outputs pixels meant for human eyes, where visual fidelity is what matters. A <strong>Simulator</strong> outputs state, a geometrically and physically faithful representation that programs can compute on. A <strong>Planner</strong> outputs <em>actions</em>. Given observations and a goal, it decides what the agent should do next, closing the perception–action loop. She argues these eventually converge into unified models, with simulation as the linchpin.</p>
 
@@ -54,7 +54,7 @@
 
 <p>The Nano World Models project evaluates across simple control environments, game simulation, and <strong>real-robot data (RT-1)</strong>. If the recipe held on real robot data at that scale, it might hold on <em>mine</em>. I had a <a href="https://github.com/SIGRobotics-UIUC/LeKiwi"><strong>LeKiwi</strong></a> mobile manipulator left over from earlier imitation-learning work. So the plan was simple. Collect my own data, train a nano-scale world model on it, and see if I could plan with it on real hardware.</p>
 
-<h2 id="the-problem-statement">1 · The Problem Statement</h2>
+<h2 id="the-problem-statement">2 · The Problem Statement</h2>
 
 <p>The classical way to make a robot go somewhere is a pipeline where you build a map with SLAM, localize yourself in it, plan a path, and follow it.</p>
 
@@ -70,7 +70,7 @@
 
 <p>That structure creates one important constraint: the distance metric used for planning has to be meaningful in the specific latent space the model predicts in. What looks like a useful distance measure globally can become nearly flat in the far field, making it impossible for the planner to tell whether a candidate action moved toward the goal. That failure mode ends up driving most of the work in <a href="#road-to-planning">§5</a>.</p>
 
-<h2 id="robot-hardware">2 · Robot Hardware</h2>
+<h2 id="robot-hardware">3 · Robot Hardware</h2>
 
 <p>The <a href="https://github.com/SIGRobotics-UIUC/LeKiwi"><strong>LeKiwi</strong></a> is an open-source mobile manipulator from UIUC and LeRobot, built around a low-cost SO-101 arm on a three-omniwheel kiwi drive base, driven by an onboard Raspberry Pi and inexpensive serial-bus servos. For navigation I use only the base, with the arm parked in a fixed pose throughout. The Pi stays light on the robot side, streaming camera frames and accepting velocity commands over the network while the world model itself runs on a rented cloud GPU connected through an SSH tunnel.</p>
 
@@ -83,7 +83,7 @@
   <figcaption><b>The rig.</b> The LeKiwi base with the arm parked and the custom mount holding the overhead camera that everything downstream depends on.</figcaption>
 </figure>
 
-<h2 id="data">3 · Data</h2>
+<h2 id="data">4 · Data</h2>
 
 <p>The most important constraint on data collection was what the model actually needs to learn. At inference time the <a href="#road-to-a-working-planner">planner</a> proposes dozens of candidate action sequences, including bad ones, and the world model has to predict what each would produce in order to rank them. Training only on clean, goal-directed demonstrations would leave the model blind to wrong actions and unable to help the planner reject them. So the collection goal was coverage, not demonstration: fill the space, vary headings, and make sure the model has seen the consequences of driving in different directions.</p>
 
@@ -115,7 +115,7 @@
   <figcaption><b>The action distribution per chunk, dead-reckoned from the raw logs.</b> Forward motion is nearly bang-bang, stopped or full speed, and the per-chunk reach is short (~1.65 cm). The lateral drift Δy that I drop sits in the sub-millimeter range.</figcaption>
 </figure>
 
-<h2 id="the-world-model">4 · The World Model</h2>
+<h2 id="the-world-model">5 · The World Model</h2>
 
 <p>The world model I used is <strong>NanoWM</strong>, a ~160M-parameter diffusion-forcing transformer that works not in pixels but in a compressed <em>latent</em> space produced by a frozen Stable-Diffusion VAE. Given a few context frames and a candidate action chunk, it predicts a latent future frame, and stacking those predictions gives a <em>rollout</em>, a short imagined sequence of what latent driving would look like. This is the JEPA approach described in the Background applied to robot navigation, predicting in abstract representation space rather than reconstructing every pixel.</p>
 
@@ -130,7 +130,7 @@
   <figcaption><b>Imagined vs. real.</b> Left: a world-model rollout from 4 context frames and a recorded action sequence. Right: what the camera actually saw. Blurry, but directionally right.</figcaption>
 </figure>
 
-<h2 id="road-to-planning">5 · Road to Planning</h2>
+<h2 id="road-to-planning">6 · Road to Planning</h2>
 
 <p>Everything above is setup. What follows is the build log: each attempt, what broke, and what it taught.</p>
 
@@ -321,7 +321,7 @@
 
 <p>It is worth acknowledging that a topological graph of training frames is not a fundamentally new idea. Classical topological navigation has used similar structures for decades. What is different here is that the nodes are real camera observations from unstructured teleoperation, the edges are detected by a learned visual similarity metric rather than hand-placed, and the local step between waypoints is solved by a learned world model rather than a geometric controller. The graph does not replace the learning; it extends the range over which the learned planner can operate.</p>
 
-<h2 id="reflection">6 · Reflection</h2>
+<h2 id="reflection">7 · Reflection</h2>
 
 <p>My goal with this project was never to build the most capable navigation system. It was to find out whether a small world model trained in a constrained environment can do meaningful planning at all. That question now has a clear answer, though a few constraints and open directions are worth naming.</p>
 

@@ -360,8 +360,7 @@ def build():
 
     hero_src = "assets/plan-demo.mp4"
     tldr_html = ""
-    numbered = []     # (n, title, slug, body)
-    background = None  # (heading, body)
+    numbered = []     # (title, body)
 
     for head, body in sections:
         if head.lower().startswith("hero"):
@@ -373,8 +372,6 @@ def build():
             paras = [inline(x.strip()) for x in re.split(r"\n\s*\n", body_c) if x.strip()]
             tldr_html = '<div class="tldr">\n  <span class="label">TL;DR</span>\n  ' + \
                 "\n  <br><br>\n  ".join(paras) + "\n</div>"
-        elif head.lower().startswith("background"):
-            background = (head, body)
         else:
             # strip any literal "N · " — sections are auto-numbered by position,
             # so splitting/reordering never requires manual renumbering
@@ -394,10 +391,7 @@ def build():
             '  </div>\n</div>\n' % hero_src)
 
     # table of contents
-    toc = ['<nav class="toc">', '  <span class="label">Contents</span>']
-    if background:
-        toc.append('  <p class="toc-intro"><a href="#background">%s</a></p>' % background[0])
-    toc.append("  <ol>")
+    toc = ['<nav class="toc">', '  <span class="label">Contents</span>', '  <ol>']
     for ttl, _ in numbered:
         toc.append('    <li><a href="#%s">%s</a></li>' % (slugify(ttl), ttl))
     toc.append("  </ol>")
@@ -406,10 +400,6 @@ def build():
 
     # article
     art = ["<article>", "", tldr_html, "", toc_html, ""]
-    if background:
-        art.append('<h2 id="background">%s</h2>\n' % background[0])
-        art.append(render_body(background[1], False))
-        art.append("")
     for idx, (ttl, body) in enumerate(numbered):
         art.append('<h2 id="%s">%d · %s</h2>\n' % (slugify(ttl), idx + 1, ttl))
         art.append(render_body(body, is_last_section=(idx == len(numbered) - 1)))
