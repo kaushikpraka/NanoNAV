@@ -28,7 +28,7 @@
 
 ## TL;DR
 
-I taught a [**LeKiwi**](https://github.com/SIGRobotics-UIUC/LeKiwi) mobile manipulator to drive to a **photograph**. Show it an image taken somewhere in the room and it finds its way there, using a stack learned entirely through an overhead camera and ~50 teleoperated episodes. A diffusion world model imagines candidate futures, a sampling-based planner picks the actions whose imagined outcome looks most like the goal, and a 4,500-node graph of moments from the training data carries the robot to goals beyond the model's local horizon. No metric map, no depth sensor, no external localization.
+I taught a [**LeKiwi**](https://github.com/SIGRobotics-UIUC/LeKiwi) mobile manipulator to drive to a **photograph**. Show it an image taken somewhere in the room and it finds its way there, using a stack learned entirely through an overhead camera and ~50 teleoperated episodes. A diffusion world model imagines candidate futures, a sampling-based planner picks the actions whose imagined outcome best matches the goal in frozen **DINOv2** semantic token space, and a 4,500-node graph of moments from the training data carries the robot to goals beyond the model's local horizon. Switching from VAE reconstruction latents to DINOv2 tokens as the scoring space was the critical pivot, because the VAE metric goes blind beyond ~25 cm while DINOv2 maintains a usable gradient across the full range. No metric map, no depth sensor, no external localization.
 
 ---
 
@@ -126,7 +126,7 @@ Training uses [**Diffusion Forcing**](https://arxiv.org/abs/2407.01392) (Chen et
 
 ## 5 · Road to Planning
 
-Everything above is setup. What follows is the build log: each attempt, what broke, and what it taught.
+Everything above is setup. What follows is the build log, each attempt, what broke, and what it taught. The full diagnostic path is below, but here is the punchline first. The initial model's temporal stride was too short, leaving the action signal buried in noise. The VAE latent is globally ordered but loses its gradient beyond ~25 cm, giving CEM nothing to minimize. Switching the prediction and scoring target to frozen DINOv2 semantic tokens restores that gradient across the full range. A topological graph of training frames then extends the planner's reach to goals beyond its local horizon.
 
 ### Planning: MPC + CEM in latent space
 
