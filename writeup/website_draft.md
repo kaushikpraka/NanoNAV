@@ -112,7 +112,13 @@ One critical knob is the **frame interval**, the temporal stride between the fra
 
 The key architecture choice is that the perception backbone, the VAE, is **frozen and pretrained**, while the 160M transformer is trained **from scratch** on my 50 episodes, making it a scene-specific latent dynamics model riding on a general perceptual backbone. It learns the physics of *this* room and generalizes to new trajectories and goals within it, not across environments.
 
+[FIGURE: ✅ assets/nanowm_arch.png]
+*NanoWM architecture. Context latents from the frozen VAE feed into a 160M transformer, conditioned on the action chunk via AdaLN. The predicted next latent is what the planner scores against the goal. The token-to-RGB decoder exists only for visualization and is never used during planning.*
+
 Training uses [**Diffusion Forcing**](https://arxiv.org/abs/2407.01392) (Chen et al., 2024), which gives each frame its own independent noise level rather than corrupting every frame to one shared level. With causal masking, this lets the network roll itself out autoregressively at inference, predicting a frame, treating it as clean context, and using that to predict the next, which is exactly the loop CEM drives. The transformer learns to **denoise the next frame's latent** given recent frames and the action chunk. The action enters through a small **additive embedding**, a choice that turns out to matter and that I revisit in [§5](#road-to-planning). Training ran for roughly **12,000 steps on a single rented H100** using AdamW with effective batch 64 in bf16, completing in a single overnight run.
+
+[FIGURE: ✅ assets/diffusion_forcing.png]
+*Diffusion Forcing vs standard diffusion. Standard diffusion corrupts every frame to the same noise level. Diffusion Forcing assigns each frame its own independent noise level, so context frames can be clean (σ=0) while the target frame is denoised. With causal masking this enables autoregressive rollout at inference: predict the next frame, treat it as clean context, repeat.*
 
 [FIGURE: ✅ assets/long_0_cmp.mp4 — autoplay/loop/muted]
 *Real vs. imagined. Left: what the camera actually saw. Right: a world-model rollout from 4 context frames and a recorded action sequence. Blurry, but directionally right.*
@@ -151,7 +157,7 @@ This first model was trained on a frame interval of f=5 (~167 ms chunks). It fai
 
 ### Does translation exist in the latent?
 
-If the frame interval is too short, each step barely moves the scene and the action signal drowns in noise. Rather than retrain, I tested this directly on the recorded frames by encoding them at f=5 and f=10, holding rotation near zero, and comparing stationary chunks against pure-translation chunks. At f=5 the distributions overlap significantly (AUC=0.942, SNR=2.57σ). At f=10 they separate cleanly (AUC=0.978, SNR=4.15σ), confirming the signal was there and the stride just needed to be wider. **AUC** measures how separable two distributions are: 0.5 means a classifier drawing from both does no better than random, and 1.0 means they are perfectly separable. **SNR** is the gap between the two distribution means expressed in standard deviations, where higher means a cleaner separation.
+If the frame interval is too short, each step barely moves the scene and the action signal drowns in noise. Rather than retrain, I tested this directly on the recorded frames by encoding them at f=5 and f=10, holding rotation near zero, and comparing stationary chunks against pure-translation chunks. At f=5 the distributions overlap significantly (AUC=0.942, SNR=2.57σ). At f=10 they separate cleanly (AUC=0.978, SNR=4.15σ), confirming the signal was there and the stride just needed to be wider. **AUC** (Area Under the Curve) measures how separable two distributions are: 0.5 means a classifier drawing from both does no better than random, and 1.0 means they are perfectly separable. **SNR** (Signal-to-Noise Ratio) is the gap between the two distribution means expressed in standard deviations, where higher means a cleaner separation.
 
 [FIGURE: ✅ assets/stationary_latent_compare_f05.png]
 *At f=5 (167 ms), stationary and translation distributions overlap heavily. The near-floor parallax signal is there but buried.*
@@ -163,7 +169,9 @@ If the frame interval is too short, each step barely moves the scene and the act
 
 ### Run 002
 
-Retrained at f=10. The action branch came alive with clean **true < zero < random** separation, random now distinctly worse than zero, confirming the model uses the action's *content*, not just its presence. Decoded rollouts visibly track translation, rotation, and arcs.
+With f=10 confirmed as the right temporal stride, I retrained the model from scratch. Before closing the loop on the robot, I ran a diagnostic to verify the model was genuinely action-conditioned. The test rolls out the world model from the same context frames three times, comparing the ground-truth recorded action, a zero action, and a random action, then measures how close each predicted outcome is to what the camera actually saw.
+
+The ordering came out clean, **true < zero < random** in prediction error. The critical gap is between zero and random. A model that only detects whether an action was provided, rather than reading its content, would treat zero and random identically. Seeing random penalized harder than zero confirms the model is listening to what the action says, not just that something was passed in. Decoded rollouts backed this up visually, tracking translation, rotation, and arcs in a way the f=5 model never did.
 
 [FIGURE: ✅ assets/action_diagnostic.png]
 *The action test, passed. True-action rollouts clearly beat zero- and random-action. The model now responds to what it's told the robot did.*

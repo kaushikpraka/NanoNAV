@@ -60,6 +60,11 @@ Sections are reviewed and cleaned one at a time, in document order:
 - `goals/run1/goal.png` — wire into First closed-loop run section (§5)
 - `⏳ assets/subgoal-graph-anim.mp4` — copy from context/figures/ into docs/assets/ if not already present
 
+## Figures needing improvement
+
+- `assets/nanowm_arch.png` — generated with matplotlib; needs polish. Consider cleaner layout, better arrow routing, and making the AdaLN mechanism more visually prominent. Possibly recreate in Figma or Excalidraw for a publication-quality look.
+- `assets/diffusion_forcing.png` — generated with matplotlib; needs polish. The two-panel comparison works but the noise bar visualization could be clearer. Consider animating the autoregressive rollout as a GIF to better convey the inference-time loop.
+
 ## Open content questions
 
 - Whether to mention LeCun's JEPA / latent-space prediction philosophy in Background (user raised, decision pending). Suggested placement: after the Fei-Fei Li taxonomy paragraph, framing the DINOv2 pivot as the practical version of "predict in abstract space, not pixels."

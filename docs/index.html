@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>NanoNAV — real-robot navigation with Nano World Models</title>
 <meta name="description" content="Latent-space planning with a Nano World Model drives a LeKiwi robot to goal images — learned from 25 minutes of driving, no maps, no depth, no pose.">
-<link rel="stylesheet" href="style.css?v=1782428063">
+<link rel="stylesheet" href="style.css?v=1782429367">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
 <script type="module" src="https://ajax.googleapis.com/ajax/libs/model-viewer/4.0.0/model-viewer.min.js"></script>
 </head>
@@ -123,7 +123,17 @@
 
 <p>The key architecture choice is that the perception backbone, the VAE, is <strong>frozen and pretrained</strong>, while the 160M transformer is trained <strong>from scratch</strong> on my 50 episodes, making it a scene-specific latent dynamics model riding on a general perceptual backbone. It learns the physics of <em>this</em> room and generalizes to new trajectories and goals within it, not across environments.</p>
 
+<figure>
+  <img src="assets/nanowm_arch.png" alt="">
+  <figcaption><b>NanoWM architecture.</b> Context latents from the frozen VAE feed into a 160M transformer, conditioned on the action chunk via AdaLN. The predicted next latent is what the planner scores against the goal. The token-to-RGB decoder exists only for visualization and is never used during planning.</figcaption>
+</figure>
+
 <p>Training uses <a href="https://arxiv.org/abs/2407.01392"><strong>Diffusion Forcing</strong></a> (Chen et al., 2024), which gives each frame its own independent noise level rather than corrupting every frame to one shared level. With causal masking, this lets the network roll itself out autoregressively at inference, predicting a frame, treating it as clean context, and using that to predict the next, which is exactly the loop CEM drives. The transformer learns to <strong>denoise the next frame's latent</strong> given recent frames and the action chunk. The action enters through a small <strong>additive embedding</strong>, a choice that turns out to matter and that I revisit in <a href="#road-to-planning">§5</a>. Training ran for roughly <strong>12,000 steps on a single rented H100</strong> using AdamW with effective batch 64 in bf16, completing in a single overnight run.</p>
+
+<figure>
+  <img src="assets/diffusion_forcing.png" alt="">
+  <figcaption><b>Diffusion Forcing vs standard diffusion.</b> Standard diffusion corrupts every frame to the same noise level. Diffusion Forcing assigns each frame its own independent noise level, so context frames can be clean (σ=0) while the target frame is denoised. With causal masking this enables autoregressive rollout at inference: predict the next frame, treat it as clean context, repeat.</figcaption>
+</figure>
 
 <figure>
   <video src="assets/long_0_cmp.mp4" autoplay loop muted playsinline></video>
@@ -158,7 +168,7 @@
 
 <h3>Does translation exist in the latent?</h3>
 
-<p>If the frame interval is too short, each step barely moves the scene and the action signal drowns in noise. Rather than retrain, I tested this directly on the recorded frames by encoding them at f=5 and f=10, holding rotation near zero, and comparing stationary chunks against pure-translation chunks. At f=5 the distributions overlap significantly (AUC=0.942, SNR=2.57σ). At f=10 they separate cleanly (AUC=0.978, SNR=4.15σ), confirming the signal was there and the stride just needed to be wider. <strong>AUC</strong> measures how separable two distributions are: 0.5 means a classifier drawing from both does no better than random, and 1.0 means they are perfectly separable. <strong>SNR</strong> is the gap between the two distribution means expressed in standard deviations, where higher means a cleaner separation.</p>
+<p>If the frame interval is too short, each step barely moves the scene and the action signal drowns in noise. Rather than retrain, I tested this directly on the recorded frames by encoding them at f=5 and f=10, holding rotation near zero, and comparing stationary chunks against pure-translation chunks. At f=5 the distributions overlap significantly (AUC=0.942, SNR=2.57σ). At f=10 they separate cleanly (AUC=0.978, SNR=4.15σ), confirming the signal was there and the stride just needed to be wider. <strong>AUC</strong> (Area Under the Curve) measures how separable two distributions are: 0.5 means a classifier drawing from both does no better than random, and 1.0 means they are perfectly separable. <strong>SNR</strong> (Signal-to-Noise Ratio) is the gap between the two distribution means expressed in standard deviations, where higher means a cleaner separation.</p>
 
 <figure>
   <img src="assets/stationary_latent_compare_f05.png" alt="">
@@ -172,7 +182,9 @@
 
 <h3>Run 002</h3>
 
-<p>Retrained at f=10. The action branch came alive with clean <strong>true < zero < random</strong> separation, random now distinctly worse than zero, confirming the model uses the action's <em>content</em>, not just its presence. Decoded rollouts visibly track translation, rotation, and arcs.</p>
+<p>With f=10 confirmed as the right temporal stride, I retrained the model from scratch. Before closing the loop on the robot, I ran a diagnostic to verify the model was genuinely action-conditioned. The test rolls out the world model from the same context frames three times, comparing the ground-truth recorded action, a zero action, and a random action, then measures how close each predicted outcome is to what the camera actually saw.</p>
+
+<p>The ordering came out clean, <strong>true < zero < random</strong> in prediction error. The critical gap is between zero and random. A model that only detects whether an action was provided, rather than reading its content, would treat zero and random identically. Seeing random penalized harder than zero confirms the model is listening to what the action says, not just that something was passed in. Decoded rollouts backed this up visually, tracking translation, rotation, and arcs in a way the f=5 model never did.</p>
 
 <figure>
   <img src="assets/action_diagnostic.png" alt="">
