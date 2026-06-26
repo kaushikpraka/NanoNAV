@@ -171,8 +171,7 @@ nav.toc ol { margin: 0; padding-left: 1.2rem; }
     color: var(--muted);
     text-decoration: none;
     border-left: 2px solid transparent;
-    margin-left: -0.9rem;
-    padding-left: 0.7rem;
+    padding-left: 0.4rem;
     display: inline-block;
     transition: color 0.12s ease;
   }
