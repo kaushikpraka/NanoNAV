@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>NanoNAV — real-robot navigation with Nano World Models</title>
 <meta name="description" content="Latent-space planning with a Nano World Model drives a LeKiwi robot to goal images — learned from 25 minutes of driving, no maps, no depth, no pose.">
-<link rel="stylesheet" href="style.css?v=1782431960">
+<link rel="stylesheet" href="style.css?v=1782432278">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
 <script type="module" src="https://ajax.googleapis.com/ajax/libs/model-viewer/4.0.0/model-viewer.min.js"></script>
 </head>
@@ -374,13 +374,13 @@
 
 <p><strong>Two-dimensional action space.</strong> Data was collected with forward and turn commands only, so the planner cannot strafe and the graph has no backward edges. Adding y-velocity and reverse would expand what the planner can express, though it would require proportionally more diverse data coverage to fill the larger action space.</p>
 
-<p><strong>Distance metric.</strong> DINOv2 cosine is a strong starting point for goal-reaching but is purely appearance-based, with no concept of obstacles or preferred routes. Extending it toward a metric that penalizes passing through specific regions would make the planner more useful in cluttered environments without requiring a separate collision map.</p>
+<p><strong>Distance metric.</strong> DINOv2 cosine is a strong starting point for goal-reaching but is purely appearance-based and inherently greedy, always descending toward the nearest visually similar state regardless of whether that path is actually navigable. It has no concept of obstacles or preferred routes, so a shorter visual path through an impassable region looks identical to a clear one. Extending it toward a metric that penalizes passing through specific regions would make the planner more useful in cluttered environments without requiring a separate collision map.</p>
 
 <p><strong>Manipulator integration.</strong> The arm spent this entire project parked and unused. One natural extension is to drive to a pickup location and hand off to a manipulation policy from there, using the navigation layer to solve the getting-there problem and a separate policy for grasping. Another could be to absorb both navigation and manipulation into the world model.</p>
 
 <p><strong>Static environment.</strong> The training data was collected with furniture fixed and no dynamic obstacles, which helped the model focus on learning the robot's own dynamics but leaves open-world generalization untested. Covering more environmental variability, different lighting, rearranged furniture, moving objects, would be the natural next step for robustness.</p>
 
-<p>It was very rewarding to see JEPA-style latent-space planning come to life on real hardware in my own apartment. I look forward to expanding on this project and exploring what is possible with world models without needing frontier levels of compute or data. If you are interested in world models/robot learning, I'd love to chat! Feel free to reach out on <a href="https://www.linkedin.com/in/kaushik-prakash-7ab477162/"><strong>LinkedIn</strong></a>.</p>
+<p>It was very rewarding to see JEPA-style latent-space planning come to life on real hardware in my own apartment. I look forward to expanding on this project and exploring what is possible with world models without needing frontier levels of compute or data. If you are working on world models/robot learning, I'd love to chat! Reach out to me on <a href="https://www.linkedin.com/in/kaushik-prakash-7ab477162/"><strong>LinkedIn</strong></a>!</p>
 
 <hr>
 <p><em>Code coming soon. Built on <a href="https://github.com/huggingface/lerobot">LeRobot</a> (LeKiwi), <a href="https://arxiv.org/abs/2605.23993">Nano World Models</a>, and frozen <a href="https://github.com/facebookresearch/dinov2">DINOv2</a> features.</em></p>

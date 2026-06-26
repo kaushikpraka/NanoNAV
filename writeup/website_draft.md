@@ -249,24 +249,27 @@ $$\text{output} = \gamma(\mathbf{a}) \cdot \text{LayerNorm}(x) + \beta(\mathbf{a
 
 Because the action now multiplicatively controls the scale of the entire feature map at every layer, the model cannot reduce its influence by tuning a weight toward zero. On the same semantic latents where additive injection collapsed to 0.0028 RMS, AdaLN held at 0.2 RMS.
 
+[FIGURE: ✅ assets/injection_comparison.png]
+*Additive injection (left) lets the model learn W→0, cutting the gradient path through the action. AdaLN (right) predicts the scale and shift of every LayerNorm from the action embedding, so the action multiplicatively gates the entire feature map. The model cannot suppress it without collapsing activations entirely, keeping the gradient path open throughout training.*
+
 In these videos the yellow arrow shows the action vector the robot executed. The goal image is shown as the 4th image in the sequence.
 
 [FIGURE: ✅ assets/dinov2_planner_demo.mp4 controls — on-robot demo of the DINOv2 flat planner reaching a nearby goal]
-*The flat planner, no graph. Goal within ~40 cm, DINOv2 metric descending, robot converging. This is the range limit the graph is built to solve.*
+*Robot navigating to a goal near the desk.*
 
 [FIGURE: ✅ assets/nograph_nearfan.mp4 controls — second no-graph demo: flat planner navigating to a nearby goal near the fan]
-*Another flat-planner run, no graph. The goal is close enough that DINOv2 cosine has a usable gradient and CEM converges without needing waypoints.*
+*Robot navigating to a goal near the fan.*
 
 [FIGURE: ✅ assets/nograph_nearchair.mp4 controls — third no-graph demo: flat planner navigating to a nearby goal near the chair]
-*A third flat-planner run, no graph, different goal location near the chair.*
+*Robot navigating to a goal near the chair.*
 
 ---
 
 ### Building a waypoint graph
 
-NOTE: The range might not actually be 40cm. Emphase that the image overlap is more important than the actual metric distance
+The planner only works when the current view and goal image share enough visual content. DINOv2 cosine distance gives CEM a gradient to descend when the robot can see the same objects, surfaces, and scene structure that appear in the goal. When there is no image overlap, the metric is uniformly uninformative: every proposed action sequence produces a rollout that looks equally dissimilar to the goal, and CEM has nothing to follow. Physical distance is a proxy for this, but it is not the real constraint. A robot one meter away but facing the same scene as the goal can plan; a robot half a meter away but rotated 180° cannot. The empirical threshold where this breaks down, a DINOv2 cosine distance of roughly 0.35 to 0.45, is a property of this room and this camera's field of view, not a fundamental limit of the method.
 
-The new metric is good for ~40 cm. Beyond that, the goal is out of range and the planner has no signal. If you start 180° rotated from the goal, CEM has nothing to descend. Every frame in the training data is a place the robot demonstrably reached, so the training data becomes the map.
+The graph solves this by ensuring every planning step stays within the image-overlap zone. Every frame in the training data is a place the robot demonstrably reached, so the training data becomes the map.
 
 To build it, I cached DINOv2 tokens for ~4,500 frames (one per chunk boundary), each becoming a **node**. **Temporal edges** connect consecutive frames within each episode, while **weld edges** connect frames from different episodes that pass through the same view, detected by token distance. Fifty disconnected episode threads fuse into one connected map this way.
 
@@ -290,7 +293,7 @@ Both the weld threshold and the waypoint spacing are calibrated from data. I set
 
 **3. Localization and waypoint tuning.** On the robot, localization flip-flopped between look-alike frames in different episodes, causing the route to re-roll every step. The fix was hysteresis, committing to a path and requiring strong evidence before re-routing. Waypoints placed too close gave CEM a nearly-identical target, producing near-zero commands, fixed by enforcing a minimum waypoint spacing.
 
-Without the graph, the flat planner succeeds from a DINOv2 cosine start distance of 0.35 but wanders from 0.45. The graph crosses exactly that threshold.
+Without the graph, the flat planner succeeds when the start-to-goal DINOv2 cosine distance is around 0.35, where there is still enough image overlap for CEM to find a gradient. At 0.45 the visual content no longer overlaps and the planner wanders. The graph keeps every local planning problem inside that workable range.
 
 
 In this run the robot starts facing the curtained wall, with no visual overlap between its starting view and the goal frame. It has to plan a route through the graph before it can make any progress toward the goal. Both videos are sped up significantly. Each three-step plan takes roughly 7 seconds to generate on an H100 and the robot executes the first action before replanning.
@@ -318,13 +321,13 @@ My goal with this project was never to build the most capable navigation system.
 
 **Two-dimensional action space.** Data was collected with forward and turn commands only, so the planner cannot strafe and the graph has no backward edges. Adding y-velocity and reverse would expand what the planner can express, though it would require proportionally more diverse data coverage to fill the larger action space.
 
-**Distance metric.** DINOv2 cosine is a strong starting point for goal-reaching but is purely appearance-based, with no concept of obstacles or preferred routes. Extending it toward a metric that penalizes passing through specific regions would make the planner more useful in cluttered environments without requiring a separate collision map.
+**Distance metric.** DINOv2 cosine is a strong starting point for goal-reaching but is purely appearance-based and inherently greedy, always descending toward the nearest visually similar state regardless of whether that path is actually navigable. It has no concept of obstacles or preferred routes, so a shorter visual path through an impassable region looks identical to a clear one. Extending it toward a metric that penalizes passing through specific regions would make the planner more useful in cluttered environments without requiring a separate collision map.
 
 **Manipulator integration.** The arm spent this entire project parked and unused. One natural extension is to drive to a pickup location and hand off to a manipulation policy from there, using the navigation layer to solve the getting-there problem and a separate policy for grasping. Another could be to absorb both navigation and manipulation into the world model.
 
 **Static environment.** The training data was collected with furniture fixed and no dynamic obstacles, which helped the model focus on learning the robot's own dynamics but leaves open-world generalization untested. Covering more environmental variability, different lighting, rearranged furniture, moving objects, would be the natural next step for robustness.
 
-It was very rewarding to see JEPA-style latent-space planning come to life on real hardware in my own apartment. I look forward to expanding on this project and exploring what is possible with world models without needing frontier levels of compute or data. If you are interested in world models/robot learning, I'd love to chat! Feel free to reach out on [**LinkedIn**](https://www.linkedin.com/in/kaushik-prakash-7ab477162/).
+It was very rewarding to see JEPA-style latent-space planning come to life on real hardware in my own apartment. I look forward to expanding on this project and exploring what is possible with world models without needing frontier levels of compute or data. If you are working on world models/robot learning, I'd love to chat! Reach out to me on [**LinkedIn**](https://www.linkedin.com/in/kaushik-prakash-7ab477162/)!
 
 ---
 
