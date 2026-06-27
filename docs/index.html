@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>NanoNAV — real-robot navigation with Nano World Models</title>
 <meta name="description" content="Latent-space planning with a Nano World Model drives a LeKiwi robot to goal images — learned from 25 minutes of driving, no maps, no depth, no pose.">
-<link rel="stylesheet" href="style.css?v=1782588835">
+<link rel="stylesheet" href="style.css?v=1782595132">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
 <script type="module" src="https://ajax.googleapis.com/ajax/libs/model-viewer/4.0.0/model-viewer.min.js"></script>
 </head>
@@ -94,7 +94,7 @@
 <p class="note"><em>Hardware at a glance: LeKiwi (LeRobot) · holonomic 3-omniwheel base · SO-ARM arm, parked · Raspberry Pi host · low-cost serial-bus servos · overhead USB camera on a custom ~55° mount. </em></p>
 
 <figure>
-  <img src="assets/lekiwi-mount.jpg" alt="">
+  <img src="assets/lekiwi-mount.jpg?v=81fc8fcc" alt="">
   
 </figure>
 
@@ -114,7 +114,7 @@
 <p>The resulting dataset is <strong>50 teleoperated episodes, 44,926 frames at 30 Hz</strong>, available on HuggingFace at <a href="https://huggingface.co/datasets/kaushikpraka/wm-smallarea_merged">kaushikpraka/wm-smallarea_merged</a> and viewable in the <a href="https://huggingface.co/spaces/lerobot/visualize_dataset">LeRobot visualizer</a>. It covers a roughly 2 m × 5 m carpeted area with blinds closed and room lights on for consistent illumination, furniture in fixed positions as landmarks. Trajectories included arcs, pure forward runs, rotations in both directions, and occasional stationary pauses as identity anchors where the action is exactly <code>(0, 0)</code>. I varied start positions and headings across episodes while keeping environmental conditions stable, and drove only forward with no reverse commands. That last choice matters later when building the navigation graph.</p>
 
 <figure>
-  <img src="assets/world_trajectories.png" alt="">
+  <img src="assets/world_trajectories.png?v=e1086667" alt="">
   <figcaption><b>A sample of the driving.</b> Dead-reckoned paths from a handful of the 50 teleoperated episodes, showing the exploratory coverage that makes up the ~25-minute dataset.</figcaption>
 </figure>
 
@@ -131,7 +131,7 @@
 <p>Dead reckoning assumes <strong>no significant slip</strong>, meaning a commanded centimeter is a real centimeter across the floor. For a light, slow robot on flat carpet that holds well enough. Since the planner re-observes a fresh frame every chunk, any small accumulated error is corrected rather than compounded. The dropped Δy never exceeds ~0.58 mm, and an open-loop replay on the real robot traced the dead-reckoned path to ~0 cm even through a 117° arc.</p>
 
 <figure>
-  <img src="assets/chunk_deltas.png" alt="">
+  <img src="assets/chunk_deltas.png?v=ab9b381c" alt="">
   <figcaption><b>The action distribution per chunk, dead-reckoned from the raw logs.</b> Forward motion is nearly bang-bang, stopped or full speed, and the per-chunk reach is short (~1.65 cm). The lateral drift Δy that I drop sits in the sub-millimeter range.</figcaption>
 </figure>
 
@@ -144,19 +144,19 @@
 <p>The key architecture choice is that the perception backbone, the VAE, is <strong>frozen and pretrained</strong>, while the 160M transformer is trained <strong>from scratch</strong> on my 50 episodes, making it a scene-specific latent dynamics model riding on a general perceptual backbone. It learns the physics of <em>this</em> room and generalizes to new trajectories and goals within it, not across environments.</p>
 
 <figure>
-  <img src="assets/nanowm_arch.svg" alt="">
+  <img src="assets/nanowm_arch.svg?v=c2ebfda7" alt="">
   <figcaption><b>NanoWM architecture.</b> Context latents from the frozen VAE feed into a 160M transformer, conditioned on the action chunk via AdaLN. The predicted next latent is what the planner scores against the goal. The token-to-RGB decoder exists only for visualization and is never used during planning.</figcaption>
 </figure>
 
 <p>Training uses <a href="https://arxiv.org/abs/2407.01392"><strong>Diffusion Forcing</strong></a> (Chen et al., 2024), which gives each frame its own independent noise level rather than corrupting every frame to one shared level. With causal masking, this lets the network roll itself out autoregressively at inference, predicting a frame, treating it as clean context, and using that to predict the next, which is exactly the loop CEM drives. The transformer learns to <strong>denoise the next frame's latent</strong> given recent frames and the action chunk. The action enters through a small <strong>additive embedding</strong>, a choice that turns out to matter and that I revisit in <a href="#road-to-planning">§5</a>. Training ran for roughly <strong>12,000 steps on a single rented H100</strong> using AdamW with effective batch 64 in bf16, completing in a single overnight run.</p>
 
 <figure>
-  <img src="assets/diffusion_forcing.svg" alt="">
+  <img src="assets/diffusion_forcing.svg?v=b085133e" alt="">
   <figcaption><b>Diffusion Forcing vs standard diffusion.</b> Standard diffusion corrupts every frame to the same noise level. Diffusion Forcing assigns each frame its own independent noise level, so context frames can be clean (σ=0) while the target frame is denoised. With causal masking this enables autoregressive rollout at inference: predict the next frame, treat it as clean context, repeat.</figcaption>
 </figure>
 
 <figure>
-  <video src="assets/long_0_cmp.mp4" autoplay loop muted playsinline></video>
+  <video src="assets/long_0_cmp.mp4?v=d2b3f9e7" autoplay loop muted playsinline></video>
   <figcaption><b>Real vs. imagined.</b> Left: what the camera actually saw. Right: a world-model rollout from 4 context frames and a recorded action sequence. Blurry, but directionally right.</figcaption>
 </figure>
 
@@ -191,12 +191,12 @@
 <p>If the frame interval is too short, each step barely moves the scene and the action signal drowns in noise. Rather than retrain, I tested this directly on the recorded frames by encoding them at f=5 and f=10, holding rotation near zero, and comparing stationary chunks against pure-translation chunks. At f=5 the distributions overlap significantly (AUC=0.942, SNR=2.57σ). At f=10 they separate cleanly (AUC=0.978, SNR=4.15σ), confirming the signal was there and the stride just needed to be wider. <strong>AUC</strong> (Area Under the Curve) measures how separable two distributions are: 0.5 means a classifier drawing from both does no better than random, and 1.0 means they are perfectly separable. <strong>SNR</strong> (Signal-to-Noise Ratio) is the gap between the two distribution means expressed in standard deviations, where higher means a cleaner separation.</p>
 
 <figure>
-  <img src="assets/stationary_latent_compare_f05.png" alt="">
+  <img src="assets/stationary_latent_compare_f05.png?v=a4bc51a3" alt="">
   <figcaption><b>At f=5 (167 ms), stationary and translation distributions overlap heavily.</b> The near-floor parallax signal is there but buried.</figcaption>
 </figure>
 
 <figure>
-  <img src="assets/stationary_latent_compare.png" alt="">
+  <img src="assets/stationary_latent_compare.png?v=58f701dc" alt="">
   <figcaption><b>At f=10 (333 ms), the distributions separate cleanly.</b> Translation lights up the near-field floor and rotation lights up the far horizon. The robot's own body stays put, acting as a built-in registration check.</figcaption>
 </figure>
 
@@ -207,14 +207,14 @@
 <p>The ordering came out clean, <strong>true < zero < random</strong> in prediction error. The critical gap is between zero and random. A model that only detects whether an action was provided, rather than reading its content, would treat zero and random identically. Seeing random penalized harder than zero confirms the model is listening to what the action says, not just that something was passed in. Decoded rollouts backed this up visually, tracking translation, rotation, and arcs in a way the f=5 model never did.</p>
 
 <figure>
-  <img src="assets/action_diagnostic.png" alt="">
+  <img src="assets/action_diagnostic.png?v=43de97a5" alt="">
   <figcaption><b>The action test, passed.</b> True-action rollouts clearly beat zero- and random-action. The model now responds to what it's told the robot did.</figcaption>
 </figure>
 
 <figure>
   <div class="row2">
-    <video src="assets/rotation_0_cmp.mp4" autoplay loop muted playsinline></video>
-    <video src="assets/translation_0_cmp.mp4" autoplay loop muted playsinline></video>
+    <video src="assets/rotation_0_cmp.mp4?v=ed92a692" autoplay loop muted playsinline></video>
+    <video src="assets/translation_0_cmp.mp4?v=5d5c8eed" autoplay loop muted playsinline></video>
   </div>
   <figcaption><b>Motion tracking.</b> The world model follows a real rotation (left) and a real translation (right), error growing over the horizon as expected.</figcaption>
 </figure>
@@ -238,7 +238,7 @@
 <p><strong>Requirement 2: far-field sensitivity.</strong> In the far band (30–60 cm out), is the per-step change large enough for CEM to detect progress above the robot's own standing-still jitter? I report this as a multiple of the noise floor, where 1.0× means one step forward changes the metric by exactly the same amount as the robot's natural variation at rest. Below that, CEM cannot distinguish "I moved toward the goal" from "I am still." This is the test that matters for planning, and it is where the failure hides.</p>
 
 <figure>
-  <img src="assets/sweep_diagram.png" alt="">
+  <img src="assets/sweep_diagram.png?v=2aa1a61e" alt="">
   <figcaption><b>The measurement grid.</b> I hand-placed the robot at each position and captured a frame. Orange poses are the near band (0–30 cm), blue are the far band where CEM needs to plan. Three yaw orientations were tested at select positions.</figcaption>
 </figure>
 
@@ -252,12 +252,12 @@
 </table>
 
 <figure>
-  <img src="assets/metric_comparison.png" alt="">
+  <img src="assets/metric_comparison.png?v=081f4ef6" alt="">
   <figcaption><b>Both metrics use the same images.</b> The VAE metric (left) plateaus after ~25 cm, where one step forward is indistinguishable from standing still and CEM has nothing to minimize. DINOv2 cosine (right) maintains a clear gradient across the full range.</figcaption>
 </figure>
 
 <figure>
-  <img src="assets/fsweep_chunk_distributions.png" alt="">
+  <img src="assets/fsweep_chunk_distributions.png?v=a6019de4" alt="">
   <figcaption><b>Why the VAE latent fails as a planning metric.</b> At f=10, rotation strongly predicts latent displacement (corr=0.70), while translation magnitude barely registers (corr=0.03). Turning sweeps the far horizon across the frame and dominates the latent; driving forward produces only near-floor parallax that the VAE compresses away. A metric built on this representation cannot see translational progress.</figcaption>
 </figure>
 
@@ -278,7 +278,7 @@
 <p>DINOv2 tokens are not directly human-readable, so to watch the model think, I trained a small <strong>token-to-RGB decoder</strong> separately to map predicted token grids back to approximate pixel frames. The planner itself never uses it, scoring entirely in token space, and the decoder exists purely for visualization.</p>
 
 <figure>
-  <img src="assets/c1_smoke_strip.png" alt="">
+  <img src="assets/c1_smoke_strip.png?v=4ffdf582" alt="">
   <figcaption><b>Imagining in semantic space.</b> The world model predicts DINOv2 tokens, and a small decoder renders them back to pixels for visualization. The planner scores in token space and never decodes.</figcaption>
 </figure>
 
@@ -297,17 +297,17 @@
 <p>In these videos the yellow arrow shows the action vector the robot executed. The goal image is shown as the 4th image in the sequence.</p>
 
 <figure>
-  <video src="assets/dinov2_planner_demo.mp4" controls loop muted playsinline></video>
+  <video src="assets/dinov2_planner_demo.mp4?v=d12adc8e" controls loop muted playsinline></video>
   <figcaption>Robot navigating to a goal near the desk.</figcaption>
 </figure>
 
 <figure>
-  <video src="assets/nograph_nearfan.mp4" controls loop muted playsinline></video>
+  <video src="assets/nograph_nearfan.mp4?v=c9dafc4f" controls loop muted playsinline></video>
   <figcaption>Robot navigating to a goal near the fan.</figcaption>
 </figure>
 
 <figure>
-  <video src="assets/nograph_nearchair.mp4" controls loop muted playsinline></video>
+  <video src="assets/nograph_nearchair.mp4?v=5b6046da" controls loop muted playsinline></video>
   <figcaption>Robot navigating to a goal near the chair.</figcaption>
 </figure>
 
@@ -324,12 +324,12 @@
 <p>Both the weld threshold and the waypoint spacing are calibrated from data. I set the weld threshold from the inter-frame distance distribution, picking the point that separates same-place views from different-place views. For waypoint spacing, I measured a reliability curve showing that one-step descent succeeds 96% of the time at 2 chunks and falls off beyond that, so I place waypoints at the 90% reliability point.</p>
 
 <figure class="wide">
-  <img src="assets/route_montage.png" alt="">
+  <img src="assets/route_montage.png?v=bfb1970b" alt="">
   <figcaption><b>A route is a film strip.</b> Dijkstra returns a sequence of remembered frames and the planner chases them one at a time.</figcaption>
 </figure>
 
 <figure class="wide">
-  <video src="assets/subgoal-graph-anim.mp4" controls loop muted playsinline></video>
+  <video src="assets/subgoal-graph-anim.mp4?v=b53cab6b" controls loop muted playsinline></video>
   <figcaption><b>Building and routing the graph.</b> Episodes become nodes, shared views weld threads together, Dijkstra hands the planner one waypoint at a time.</figcaption>
 </figure>
 
@@ -467,31 +467,6 @@
   window.addEventListener('scroll', onScroll, { passive: true });
   window.addEventListener('resize', onScroll, { passive: true });
   update();
-})();
-
-// Theme toggle — cycles cream → gray → dark, persists via localStorage
-(function () {
-  var themes = ['cream', 'gray', 'slate', 'dark'];
-  var saved = localStorage.getItem('nanovnav-theme') || 'cream';
-
-  function apply(theme) {
-    document.body.classList.remove('theme-gray', 'theme-slate', 'theme-dark');
-    if (theme === 'gray')  document.body.classList.add('theme-gray');
-    if (theme === 'slate') document.body.classList.add('theme-slate');
-    if (theme === 'dark')  document.body.classList.add('theme-dark');
-    btn.textContent = theme;
-    localStorage.setItem('nanovnav-theme', theme);
-    saved = theme;
-  }
-
-  var btn = document.createElement('button');
-  btn.id = 'theme-toggle';
-  btn.setAttribute('aria-label', 'Toggle colour theme');
-  btn.onclick = function () {
-    apply(themes[(themes.indexOf(saved) + 1) % themes.length]);
-  };
-  document.body.appendChild(btn);
-  apply(saved);
 })();
 </script>
 <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>

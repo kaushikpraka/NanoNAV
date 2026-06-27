@@ -28,6 +28,7 @@ Conventions understood in the markdown:
 Figures/tables/asides are maintained in the markdown alongside the prose; only
 the page scaffolding (head, hero shell, sticky-TOC script, footer) lives here.
 """
+import hashlib
 import os
 import re
 
@@ -38,6 +39,18 @@ ASSETS_DIR = os.path.join(ROOT, "docs", "assets")
 
 MEDIA_RE = re.compile(r"[\w./-]+\.(?:png|jpe?g|gif|svg|mp4|webm|glb|usdz)", re.I)
 _pair_counter = [0]
+
+
+def asset_src(base):
+    """assets/<base> with a short content-hash ?v= so updated files never get
+    served stale from a browser or GitHub Pages CDN cache."""
+    path = os.path.join(ASSETS_DIR, base)
+    try:
+        with open(path, "rb") as f:
+            h = hashlib.md5(f.read()).hexdigest()[:8]
+        return "assets/%s?v=%s" % (base, h)
+    except OSError:
+        return "assets/" + base
 
 
 def slugify(s):
@@ -148,31 +161,6 @@ SCRIPT = """<script>
   window.addEventListener('resize', onScroll, { passive: true });
   update();
 })();
-
-// Theme toggle — cycles cream → gray → dark, persists via localStorage
-(function () {
-  var themes = ['cream', 'gray', 'slate', 'dark'];
-  var saved = localStorage.getItem('nanovnav-theme') || 'cream';
-
-  function apply(theme) {
-    document.body.classList.remove('theme-gray', 'theme-slate', 'theme-dark');
-    if (theme === 'gray')  document.body.classList.add('theme-gray');
-    if (theme === 'slate') document.body.classList.add('theme-slate');
-    if (theme === 'dark')  document.body.classList.add('theme-dark');
-    btn.textContent = theme;
-    localStorage.setItem('nanovnav-theme', theme);
-    saved = theme;
-  }
-
-  var btn = document.createElement('button');
-  btn.id = 'theme-toggle';
-  btn.setAttribute('aria-label', 'Toggle colour theme');
-  btn.onclick = function () {
-    apply(themes[(themes.indexOf(saved) + 1) % themes.length]);
-  };
-  document.body.appendChild(btn);
-  apply(saved);
-})();
 </script>
 <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
 <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"
@@ -255,7 +243,7 @@ def render_figure(marker, caption):
     cap = caption_html(caption) if caption else ""
 
     def media(base):
-        src = "assets/" + base
+        src = asset_src(base)
         if base.lower().endswith((".mp4", ".webm")):
             attrs = "controls loop muted playsinline" if "controls" in marker.lower() \
                 else "autoplay loop muted playsinline"
