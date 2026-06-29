@@ -65,9 +65,9 @@ That creates one important constraint: a distance measure that looks useful can 
 
 The [**LeKiwi**](https://github.com/SIGRobotics-UIUC/LeKiwi) is an open-source mobile manipulator from UIUC and LeRobot, built around a low-cost SO-101 arm on a three-omniwheel kiwi drive base, driven by an onboard Raspberry Pi and inexpensive serial-bus servos. For navigation I use only the base, with the arm parked in a fixed pose throughout. The Pi stays light on the robot side, streaming camera frames and accepting velocity commands over the network while the world model itself runs on a rented cloud GPU connected through an SSH tunnel.
 
-The stock LeKiwi uses a low front-facing webcam and a gripper webcam. I replaced all three with wider-angle USB cameras and supplemented with a [third overhead camera](https://www.amazon.com/dp/B0C289GYVZ?ref=ppx_yo2ov_dt_b_product_details&th=1) on a custom mount, angled down at roughly 55°. That overhead vantage is what everything downstream depends on, capturing the scene across four depth zones at once, from the robot's own body and the near floor out to the mid-room objects and far walls.
+The stock LeKiwi uses a low front-facing webcam and a gripper webcam. I replaced all three with wider-angle USB cameras and supplemented with a [third overhead camera](https://www.amazon.com/dp/B0C289GYVZ) on a custom mount, angled down at roughly 55°. That overhead vantage is what everything downstream depends on, capturing the scene across four depth zones at once, from the robot's own body and the near floor out to the mid-room objects and far walls.
 
-*Hardware at a glance: LeKiwi (LeRobot) · holonomic 3-omniwheel base · SO101-ARM arm· Raspberry Pi 5 host · low-cost serial-bus servos · overhead USB camera on a custom mount.*
+*Hardware at a glance: LeKiwi (LeRobot) · holonomic 3-omniwheel base · SO-101 arm · Raspberry Pi 5 host · low-cost serial-bus servos · overhead USB camera on a custom mount.*
 
 [FIGURE: ✅ assets/lekiwi-mount.jpg — photo of the LeKiwi with the custom overhead camera mount]
 
@@ -76,7 +76,7 @@ The stock LeKiwi uses a low front-facing webcam and a gripper webcam. I replaced
 
 ## 3 · Data
 
-The most important constraint on data collection was what the model actually needs to learn. At inference time the [planner](#road-to-a-working-planner) samples dozens of candidate action sequences, good and bad, and rolls each through the world model to score the imagined outcome against the goal. A model trained only on successful trajectories cannot predict what a wrong action looks like, which means the planner has no way to score it lower than a good one. So the collection goal was coverage, not demonstration: fill the space, vary headings, and make sure the model has seen the consequences of driving in different directions.
+The most important constraint on data collection was what the model actually needs to learn. At inference time the [planner](#road-to-planning) samples dozens of candidate action sequences, good and bad, and rolls each through the world model to score the imagined outcome against the goal. A model trained only on successful trajectories cannot predict what a wrong action looks like, which means the planner has no way to score it lower than a good one. So the collection goal was coverage, not demonstration: fill the space, vary headings, and make sure the model has seen the consequences of driving in different directions.
 
 Collection was entirely manual, using **LeRobot's `record` pipeline** to timestamp and synchronize the overhead camera with commanded base velocities at 30 Hz. For teleoperation, I connected a PS5 DualSense over USB to drive forward velocity on the left stick and yaw rate on the right, with no strafe binding so sideways velocity is zero by construction.
 
@@ -189,9 +189,6 @@ The ordering came out clean, **true < zero < random** in prediction error. The c
 [TODO: optional — add a photo of the robot's start position]
 
 The robot wandered. The VAE latent L2 distance-to-goal hovered around 45 (a raw latent distance, not centimetres) for 22 steps, with the yaw command flip-flopping every step. The world model rollouts looked reasonable and the planner was sampling correctly, which pointed the blame at the **distance metric** rather than either of them.
-
-[FIGURE: 🆕 assets/first_closedloop_rerun.mp4 — Rerun screen recording of the first closed-loop run]
-*The first closed-loop run, and the failure that drove the rest of the project. Live camera (left) against the goal image (right), with the SD-VAE latent distance-to-goal traced below. The robot is commanded forward and the yaw command flips sign step to step, yet the distance never moves: it hovers in the 44–46 band and then locks dead at 44.1. The metric is flat in the far field, so every candidate action looks equidistant from the goal and CEM has nothing to minimize. Recording: mpc_nearfan.rrd.*
 
 To check, I hand-placed the robot at measured distances from the goal, varied its yaw orientation at each position, and recorded the latents for three candidate metrics: pixel L1, SD-VAE latent L2, and frozen DINOv2 patch cosine. Each metric decreased monotonically with distance, which looked reassuring. What that test missed was the rate of decrease: in the far band the gradient was so shallow it was buried in the robot's own standing-still noise, so CEM could not distinguish one candidate action from another. That failure only became clear through the systematic sweep described in the next section.
 

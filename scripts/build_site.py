@@ -72,8 +72,18 @@ HEAD = """<!DOCTYPE html>
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>NanoNAV — real-robot navigation with Nano World Models</title>
-<meta name="description" content="Latent-space planning with a Nano World Model drives a LeKiwi robot to goal images — learned from 25 minutes of driving, no maps, no depth, no pose.">
+<title>NanoNAV: real-robot navigation with Nano World Models</title>
+<meta name="description" content="Latent-space planning with a Nano World Model drives a LeKiwi robot to goal images, learned from 25 minutes of driving, no maps, no depth, no pose.">
+<link rel="canonical" href="https://kaushikpraka.github.io/NanoNAV/">
+<meta property="og:type" content="article">
+<meta property="og:url" content="https://kaushikpraka.github.io/NanoNAV/">
+<meta property="og:title" content="NanoNAV: real-robot navigation with Nano World Models">
+<meta property="og:description" content="Latent-space planning with a Nano World Model drives a LeKiwi robot to goal images, learned from 25 minutes of driving, no maps, no depth, no pose.">
+<meta property="og:image" content="https://kaushikpraka.github.io/NanoNAV/assets/og_card.jpg">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="NanoNAV: real-robot navigation with Nano World Models">
+<meta name="twitter:description" content="Latent-space planning with a Nano World Model drives a LeKiwi robot to goal images, learned from 25 minutes of driving, no maps, no depth, no pose.">
+<meta name="twitter:image" content="https://kaushikpraka.github.io/NanoNAV/assets/og_card.jpg">
 <link rel="stylesheet" href="style.css?v=%s">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
 <script type="module" src="https://ajax.googleapis.com/ajax/libs/model-viewer/4.0.0/model-viewer.min.js"></script>

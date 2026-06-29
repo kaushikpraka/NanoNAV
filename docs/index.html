@@ -3,9 +3,19 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>NanoNAV — real-robot navigation with Nano World Models</title>
-<meta name="description" content="Latent-space planning with a Nano World Model drives a LeKiwi robot to goal images — learned from 25 minutes of driving, no maps, no depth, no pose.">
-<link rel="stylesheet" href="style.css?v=1782700932">
+<title>NanoNAV: real-robot navigation with Nano World Models</title>
+<meta name="description" content="Latent-space planning with a Nano World Model drives a LeKiwi robot to goal images, learned from 25 minutes of driving, no maps, no depth, no pose.">
+<link rel="canonical" href="https://kaushikpraka.github.io/NanoNAV/">
+<meta property="og:type" content="article">
+<meta property="og:url" content="https://kaushikpraka.github.io/NanoNAV/">
+<meta property="og:title" content="NanoNAV: real-robot navigation with Nano World Models">
+<meta property="og:description" content="Latent-space planning with a Nano World Model drives a LeKiwi robot to goal images, learned from 25 minutes of driving, no maps, no depth, no pose.">
+<meta property="og:image" content="https://kaushikpraka.github.io/NanoNAV/assets/og_card.jpg">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="NanoNAV: real-robot navigation with Nano World Models">
+<meta name="twitter:description" content="Latent-space planning with a Nano World Model drives a LeKiwi robot to goal images, learned from 25 minutes of driving, no maps, no depth, no pose.">
+<meta name="twitter:image" content="https://kaushikpraka.github.io/NanoNAV/assets/og_card.jpg">
+<link rel="stylesheet" href="style.css?v=1782715986">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
 <script type="module" src="https://ajax.googleapis.com/ajax/libs/model-viewer/4.0.0/model-viewer.min.js"></script>
 </head>
@@ -90,9 +100,9 @@
 
 <p>The <a href="https://github.com/SIGRobotics-UIUC/LeKiwi"><strong>LeKiwi</strong></a> is an open-source mobile manipulator from UIUC and LeRobot, built around a low-cost SO-101 arm on a three-omniwheel kiwi drive base, driven by an onboard Raspberry Pi and inexpensive serial-bus servos. For navigation I use only the base, with the arm parked in a fixed pose throughout. The Pi stays light on the robot side, streaming camera frames and accepting velocity commands over the network while the world model itself runs on a rented cloud GPU connected through an SSH tunnel.</p>
 
-<p>The stock LeKiwi uses a low front-facing webcam and a gripper webcam. I replaced all three with wider-angle USB cameras and supplemented with a <a href="https://www.amazon.com/dp/B0C289GYVZ?ref=ppx_yo2ov_dt_b_product_details&th=1">third overhead camera</a> on a custom mount, angled down at roughly 55°. That overhead vantage is what everything downstream depends on, capturing the scene across four depth zones at once, from the robot's own body and the near floor out to the mid-room objects and far walls.</p>
+<p>The stock LeKiwi uses a low front-facing webcam and a gripper webcam. I replaced all three with wider-angle USB cameras and supplemented with a <a href="https://www.amazon.com/dp/B0C289GYVZ">third overhead camera</a> on a custom mount, angled down at roughly 55°. That overhead vantage is what everything downstream depends on, capturing the scene across four depth zones at once, from the robot's own body and the near floor out to the mid-room objects and far walls.</p>
 
-<p class="note"><em>Hardware at a glance: LeKiwi (LeRobot) · holonomic 3-omniwheel base · SO101-ARM arm· Raspberry Pi 5 host · low-cost serial-bus servos · overhead USB camera on a custom mount.</em></p>
+<p class="note"><em>Hardware at a glance: LeKiwi (LeRobot) · holonomic 3-omniwheel base · SO-101 arm · Raspberry Pi 5 host · low-cost serial-bus servos · overhead USB camera on a custom mount.</em></p>
 
 <figure>
   <img src="assets/lekiwi-mount.jpg?v=81fc8fcc" alt="">
@@ -106,7 +116,7 @@
 
 <h2 id="data">4 · Data</h2>
 
-<p>The most important constraint on data collection was what the model actually needs to learn. At inference time the <a href="#road-to-a-working-planner">planner</a> samples dozens of candidate action sequences, good and bad, and rolls each through the world model to score the imagined outcome against the goal. A model trained only on successful trajectories cannot predict what a wrong action looks like, which means the planner has no way to score it lower than a good one. So the collection goal was coverage, not demonstration: fill the space, vary headings, and make sure the model has seen the consequences of driving in different directions.</p>
+<p>The most important constraint on data collection was what the model actually needs to learn. At inference time the <a href="#road-to-planning">planner</a> samples dozens of candidate action sequences, good and bad, and rolls each through the world model to score the imagined outcome against the goal. A model trained only on successful trajectories cannot predict what a wrong action looks like, which means the planner has no way to score it lower than a good one. So the collection goal was coverage, not demonstration: fill the space, vary headings, and make sure the model has seen the consequences of driving in different directions.</p>
 
 <p>Collection was entirely manual, using <strong>LeRobot's <code>record</code> pipeline</strong> to timestamp and synchronize the overhead camera with commanded base velocities at 30 Hz. For teleoperation, I connected a PS5 DualSense over USB to drive forward velocity on the left stick and yaw rate on the right, with no strafe binding so sideways velocity is zero by construction.</p>
 
@@ -231,8 +241,6 @@
 <h3 id="first-closed-loop-run">First closed-loop run</h3>
 
 <p>The robot wandered. The VAE latent L2 distance-to-goal hovered around 45 (a raw latent distance, not centimetres) for 22 steps, with the yaw command flip-flopping every step. The world model rollouts looked reasonable and the planner was sampling correctly, which pointed the blame at the <strong>distance metric</strong> rather than either of them.</p>
-
-<div class="pending"><b>Pending figure.</b> The first closed-loop run, and the failure that drove the rest of the project. Live camera (left) against the goal image (right), with the SD-VAE latent distance-to-goal traced below. The robot is commanded forward and the yaw command flips sign step to step, yet the distance never moves: it hovers in the 44–46 band and then locks dead at 44.1. The metric is flat in the far field, so every candidate action looks equidistant from the goal and CEM has nothing to minimize. Recording: mpc_nearfan.rrd.</div>
 
 <p>To check, I hand-placed the robot at measured distances from the goal, varied its yaw orientation at each position, and recorded the latents for three candidate metrics: pixel L1, SD-VAE latent L2, and frozen DINOv2 patch cosine. Each metric decreased monotonically with distance, which looked reassuring. What that test missed was the rate of decrease: in the far band the gradient was so shallow it was buried in the robot's own standing-still noise, so CEM could not distinguish one candidate action from another. That failure only became clear through the systematic sweep described in the next section.</p>
 
