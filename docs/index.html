@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>NanoNAV — real-robot navigation with Nano World Models</title>
 <meta name="description" content="Latent-space planning with a Nano World Model drives a LeKiwi robot to goal images — learned from 25 minutes of driving, no maps, no depth, no pose.">
-<link rel="stylesheet" href="style.css?v=1782698774">
+<link rel="stylesheet" href="style.css?v=1782699795">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
 <script type="module" src="https://ajax.googleapis.com/ajax/libs/model-viewer/4.0.0/model-viewer.min.js"></script>
 </head>
@@ -364,6 +364,11 @@
 <p>In the first run the robot starts facing the curtained wall, with no visual overlap between its starting view and the goal frame. It has to plan a route through the graph before it can make any progress toward the goal. Both videos are sped up significantly. Each three-step plan takes roughly 7 seconds to generate on an H100 and the robot executes the first action before replanning.</p>
 
 <figure>
+  <img src="assets/hamper_startgoal.jpg?v=c7f452d6" alt="">
+  <figcaption><b>Start and goal for this run, side by side.</b> The goal is a photograph captured beforehand at the destination, and the planner has to route through the graph to connect the two.</figcaption>
+</figure>
+
+<figure>
   <div class="video-pair" data-sync-group="0">
     <video id="vp-0-a" src="assets/plan-demo-6s.mp4" controls loop muted playsinline></video>
     <video id="vp-0-b" src="assets/topdown_graph_hamper-6s.mp4" controls loop muted playsinline></video>
@@ -372,6 +377,11 @@
 </figure>
 
 <p>The second run reaches a fan across the room, again routing through the graph from a start with no overlap with the goal.</p>
+
+<figure>
+  <img src="assets/nearfan2_startgoal.jpg?v=17403876" alt="">
+  <figcaption><b>Start and goal for the fan run.</b> As before, the goal image was captured at the destination ahead of time.</figcaption>
+</figure>
 
 <figure>
   <div class="video-pair" data-sync-group="1">
@@ -386,6 +396,8 @@
 <p>My goal with this project was never to build the most capable navigation system. It was to find out whether a small world model trained in a constrained environment can do meaningful planning at all. That question now has a clear answer, though a few constraints and open directions are worth naming.</p>
 
 <p><strong>Bounded by training data.</strong> The graph, world model, and distance metric all assume the robot is in the same room it drove through during collection. DINOv2 embeddings will generalize to new environments, but whether the learned action-to-latent dynamics will transfer is an open question worth testing.</p>
+
+<p><strong>Goals must be photographed in advance.</strong> A goal is specified as an image captured beforehand at the destination, from the same overhead camera the robot navigates with. Keeping the goal in image space is what lets the whole pipeline run with no maps and no coordinates, but it is also a real drawback. The robot can only be sent to places that have already been visited and photographed from the right vantage point, so it cannot yet be pointed at a coordinate, a spoken instruction, or a picture taken from a phone. Each of those would need an extra grounding step that maps the request back into the robot's own camera space, which this system does not have.</p>
 
 <p><strong>Navigational precision.</strong> The robot reliably reaches the goal area, but the final pose can be offset in translation and rotation, most visibly in the third no-graph demo where the robot converges to the right location but does not pixel-match the goal. A visual-servo step that can strafe and reverse would close that gap more reliably than asking CEM to solve a millimeter-level docking problem.</p>
 
