@@ -248,7 +248,7 @@ $$\text{output} = \gamma(\mathbf{a}) \cdot \text{LayerNorm}(x) + \beta(\mathbf{a
 
 Because the action now multiplicatively controls the scale of the entire feature map at every layer, the model cannot reduce its influence by tuning a weight toward zero. On the same semantic latents where additive injection collapsed to 0.0028 RMS, AdaLN held at 0.2 RMS.
 
-[FIGURE: ✅ assets/injection_comparison.png]
+[FIGURE: ✅ assets/injection_comparison.svg]
 *Additive injection (left) lets the model learn W→0, cutting the gradient path through the action. AdaLN (right) predicts the scale and shift of every LayerNorm from the action embedding, so the action multiplicatively gates the entire feature map. The model cannot suppress it without collapsing activations entirely, keeping the gradient path open throughout training.*
 
 In these videos the yellow arrow shows the action vector the robot executed. The goal image is shown as the 4th image in the sequence.

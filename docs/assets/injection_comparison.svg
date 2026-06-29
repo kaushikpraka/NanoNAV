@@ -1,0 +1,63 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1160 520" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" role="img" aria-label="Additive vs AdaLN action injection">
+<defs>
+<linearGradient id="card" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fdf7e9"/><stop offset="1" stop-color="#f6ecd2"/></linearGradient>
+<filter id="soft" x="-25%" y="-25%" width="150%" height="150%"><feDropShadow dx="0" dy="2" stdDeviation="2.5" flood-color="#2c2722" flood-opacity="0.12"/></filter>
+<marker id="ah-5d8a8a" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto" markerUnits="userSpaceOnUse"><path d="M0,0 L7.5,3 L0,6 Z" fill="#5d8a8a"/></marker>
+<marker id="ah-b3552c" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto" markerUnits="userSpaceOnUse"><path d="M0,0 L7.5,3 L0,6 Z" fill="#b3552c"/></marker>
+<marker id="ah-845a8e" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto" markerUnits="userSpaceOnUse"><path d="M0,0 L7.5,3 L0,6 Z" fill="#845a8e"/></marker>
+<marker id="ah-a79f8d" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto" markerUnits="userSpaceOnUse"><path d="M0,0 L7.5,3 L0,6 Z" fill="#a79f8d"/></marker>
+<marker id="ah-7c7565" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto" markerUnits="userSpaceOnUse"><path d="M0,0 L7.5,3 L0,6 Z" fill="#7c7565"/></marker>
+</defs>
+<rect x="1" y="1" width="1158" height="518" rx="18" fill="url(#card)" stroke="#e7dcc0" stroke-width="1.5"/>
+<text x="580.0" y="36" text-anchor="middle" font-size="19" font-weight="700" fill="#2c2722">Action conditioning · Additive vs AdaLN injection</text>
+<line x1="580" y1="64" x2="580" y2="446" stroke="#e7dcc0" stroke-width="1.3"/>
+<text x="56" y="78" font-size="15" font-weight="700" fill="#2c2722">Additive injection</text>
+<text x="56" y="97" font-size="12" font-style="italic" fill="#7c7565">the action is a residual the model can zero out</text>
+<rect x="216.0" y="116" width="168" height="34" rx="9" fill="#fbf3e2" stroke="#e7dcc0" stroke-width="1.6" filter="url(#soft)"/><text x="300" y="138" text-anchor="middle" font-size="15" fill="#2c2722">x&#8242; = x + W&#183;a</text>
+<text x="74" y="196" font-size="12" font-style="italic" fill="#2d4a4a">hidden state x</text>
+<path d="M70,212 L286,212" fill="none" stroke="#5d8a8a" stroke-width="3" stroke-linecap="round" marker-end="url(#ah-5d8a8a)"/>
+<path d="M316,212 L486,212" fill="none" stroke="#5d8a8a" stroke-width="3" stroke-linecap="round" marker-end="url(#ah-5d8a8a)"/>
+<circle cx="300" cy="212" r="15" fill="#fffdf6" stroke="#c0613c" stroke-width="2" filter="url(#soft)"/><text x="300" y="217.5" text-anchor="middle" font-size="18" font-weight="700" fill="#c0613c">+</text>
+<text x="498" y="217" font-size="15" font-style="italic" fill="#2d4a4a">x&#8242;</text>
+<rect x="108" y="300" width="116" height="46" rx="9" fill="#f4d9c1" stroke="#b3552c" stroke-width="1.7" filter="url(#soft)"/><text x="166.0" y="328.0" text-anchor="middle" font-size="14" font-weight="700" fill="#7a3a1a">action  a</text>
+<g><animate attributeName="opacity" values="0.95;0.12;0.12;0.95" keyTimes="0;0.42;0.9;1" dur="4.5s" repeatCount="indefinite"/><path d="M196,300 C220,262 250,235 292,224" fill="none" stroke="#b3552c" stroke-width="2.4" stroke-linecap="round" marker-end="url(#ah-b3552c)"/><rect x="232" y="246" width="44" height="26" rx="7" fill="#fffdf6" stroke="#b3552c" stroke-width="1.6"/><text x="254" y="263" text-anchor="middle" font-size="13" font-weight="700" fill="#b3552c">&#215;W</text></g>
+<text x="150" y="372" font-size="11" font-style="italic" fill="#7c7565">model learns W &#8594; 0</text>
+<rect x="500" y="272" width="32" height="132" rx="4" fill="#efe7d4" stroke="#e0d4b6" stroke-width="1"/>
+<rect x="500" width="32" rx="4" fill="#c0613c"><animate attributeName="height" values="106;2;2;106" keyTimes="0;0.42;0.9;1" dur="4.5s" repeatCount="indefinite"/><animate attributeName="y" values="298;402;402;298" keyTimes="0;0.42;0.9;1" dur="4.5s" repeatCount="indefinite"/></rect>
+<text x="516" y="262" text-anchor="middle" font-size="11.5" font-weight="700" fill="#2c2722">action RMS</text>
+<text x="516" y="424" text-anchor="middle" font-size="12.5" font-weight="700" fill="#c0613c">✗ 0.0028</text>
+<text x="300" y="476" text-anchor="middle" font-size="12.5" fill="#2c2722">gradient path through the action closes &#8212; it atrophies</text>
+<text x="616" y="78" font-size="15" font-weight="700" fill="#2c2722">AdaLN injection</text>
+<text x="616" y="97" font-size="12" font-style="italic" fill="#7c7565">the action scales every LayerNorm, so it cannot be zeroed</text>
+<rect x="735.0" y="116" width="250" height="34" rx="9" fill="#fbf3e2" stroke="#e7dcc0" stroke-width="1.6" filter="url(#soft)"/><text x="860" y="138" text-anchor="middle" font-size="15" fill="#2c2722">x&#8242; = &#947;(a)&#183;LN(x) + &#946;(a)</text>
+<text x="634" y="196" font-size="12" font-style="italic" fill="#2d4a4a">x</text>
+<path d="M634,212 L676,212" fill="none" stroke="#5d8a8a" stroke-width="3" stroke-linecap="round" marker-end="url(#ah-5d8a8a)"/>
+<rect x="678" y="196" width="48" height="32" rx="9" fill="#d3e3e3" stroke="#5d8a8a" stroke-width="1.7" filter="url(#soft)"/><text x="702.0" y="217.0" text-anchor="middle" font-size="13" font-weight="700" fill="#2d4a4a">LN</text>
+<path d="M726,212 L786,212" fill="none" stroke="#5d8a8a" stroke-width="3" stroke-linecap="round" marker-end="url(#ah-5d8a8a)"/>
+<circle cx="802" cy="212" r="15" fill="#fffdf6" stroke="#845a8e" stroke-width="2" filter="url(#soft)"/><text x="802" y="217.5" text-anchor="middle" font-size="18" font-weight="700" fill="#845a8e">&#215;</text>
+<path d="M818,212 L876,212" fill="none" stroke="#5d8a8a" stroke-width="3" stroke-linecap="round" marker-end="url(#ah-5d8a8a)"/>
+<circle cx="892" cy="212" r="15" fill="#fffdf6" stroke="#845a8e" stroke-width="2" filter="url(#soft)"/><text x="892" y="217.5" text-anchor="middle" font-size="18" font-weight="700" fill="#845a8e">+</text>
+<path d="M908,212 L1042,212" fill="none" stroke="#5d8a8a" stroke-width="3" stroke-linecap="round" marker-end="url(#ah-5d8a8a)"/>
+<text x="1050" y="217" font-size="15" font-style="italic" fill="#2d4a4a">x&#8242;</text>
+<rect x="648" y="300" width="116" height="46" rx="9" fill="#f4d9c1" stroke="#b3552c" stroke-width="1.7" filter="url(#soft)"/><text x="706.0" y="328.0" text-anchor="middle" font-size="14" font-weight="700" fill="#7a3a1a">action  a</text>
+<path d="M736,300 C760,266 778,244 800,230" fill="none" stroke="#b3552c" stroke-width="2.4" stroke-linecap="round" marker-end="url(#ah-b3552c)"/>
+<path d="M752,300 C800,262 856,244 890,230" fill="none" stroke="#b3552c" stroke-width="2.4" stroke-linecap="round" marker-end="url(#ah-b3552c)"/>
+<text x="766" y="268" font-size="13" font-style="italic" fill="#b3552c">&#947;(a)</text>
+<text x="858" y="262" font-size="13" font-style="italic" fill="#b3552c">&#946;(a)</text>
+<text x="985.5" y="378" text-anchor="middle" font-size="11" font-style="italic" fill="#523460">feature map gated by &#947;(a)</text>
+<rect x="928.0" width="7" rx="1.5" fill="#845a8e" opacity="0.85"><animate attributeName="height" values="7.0;17.5;7.0" dur="2.6s" begin="0.0s" repeatCount="indefinite" calcMode="spline" keyTimes="0;0.5;1" keySplines="0.4 0 0.6 1;0.4 0 0.6 1"/><animate attributeName="y" values="353.0;342.5;353.0" dur="2.6s" begin="0.0s" repeatCount="indefinite" calcMode="spline" keyTimes="0;0.5;1" keySplines="0.4 0 0.6 1;0.4 0 0.6 1"/></rect>
+<rect x="939.5" width="7" rx="1.5" fill="#845a8e" opacity="0.85"><animate attributeName="height" values="10.5;26.2;10.5" dur="2.6s" begin="-0.25s" repeatCount="indefinite" calcMode="spline" keyTimes="0;0.5;1" keySplines="0.4 0 0.6 1;0.4 0 0.6 1"/><animate attributeName="y" values="349.5;333.8;349.5" dur="2.6s" begin="-0.25s" repeatCount="indefinite" calcMode="spline" keyTimes="0;0.5;1" keySplines="0.4 0 0.6 1;0.4 0 0.6 1"/></rect>
+<rect x="951.0" width="7" rx="1.5" fill="#845a8e" opacity="0.85"><animate attributeName="height" values="14.0;35.0;14.0" dur="2.6s" begin="-0.5s" repeatCount="indefinite" calcMode="spline" keyTimes="0;0.5;1" keySplines="0.4 0 0.6 1;0.4 0 0.6 1"/><animate attributeName="y" values="346.0;325.0;346.0" dur="2.6s" begin="-0.5s" repeatCount="indefinite" calcMode="spline" keyTimes="0;0.5;1" keySplines="0.4 0 0.6 1;0.4 0 0.6 1"/></rect>
+<rect x="962.5" width="7" rx="1.5" fill="#845a8e" opacity="0.85"><animate attributeName="height" values="17.5;43.8;17.5" dur="2.6s" begin="-0.75s" repeatCount="indefinite" calcMode="spline" keyTimes="0;0.5;1" keySplines="0.4 0 0.6 1;0.4 0 0.6 1"/><animate attributeName="y" values="342.5;316.2;342.5" dur="2.6s" begin="-0.75s" repeatCount="indefinite" calcMode="spline" keyTimes="0;0.5;1" keySplines="0.4 0 0.6 1;0.4 0 0.6 1"/></rect>
+<rect x="974.0" width="7" rx="1.5" fill="#845a8e" opacity="0.85"><animate attributeName="height" values="7.0;17.5;7.0" dur="2.6s" begin="-1.0s" repeatCount="indefinite" calcMode="spline" keyTimes="0;0.5;1" keySplines="0.4 0 0.6 1;0.4 0 0.6 1"/><animate attributeName="y" values="353.0;342.5;353.0" dur="2.6s" begin="-1.0s" repeatCount="indefinite" calcMode="spline" keyTimes="0;0.5;1" keySplines="0.4 0 0.6 1;0.4 0 0.6 1"/></rect>
+<rect x="985.5" width="7" rx="1.5" fill="#845a8e" opacity="0.85"><animate attributeName="height" values="10.5;26.2;10.5" dur="2.6s" begin="0.0s" repeatCount="indefinite" calcMode="spline" keyTimes="0;0.5;1" keySplines="0.4 0 0.6 1;0.4 0 0.6 1"/><animate attributeName="y" values="349.5;333.8;349.5" dur="2.6s" begin="0.0s" repeatCount="indefinite" calcMode="spline" keyTimes="0;0.5;1" keySplines="0.4 0 0.6 1;0.4 0 0.6 1"/></rect>
+<rect x="997.0" width="7" rx="1.5" fill="#845a8e" opacity="0.85"><animate attributeName="height" values="14.0;35.0;14.0" dur="2.6s" begin="-0.25s" repeatCount="indefinite" calcMode="spline" keyTimes="0;0.5;1" keySplines="0.4 0 0.6 1;0.4 0 0.6 1"/><animate attributeName="y" values="346.0;325.0;346.0" dur="2.6s" begin="-0.25s" repeatCount="indefinite" calcMode="spline" keyTimes="0;0.5;1" keySplines="0.4 0 0.6 1;0.4 0 0.6 1"/></rect>
+<rect x="1008.5" width="7" rx="1.5" fill="#845a8e" opacity="0.85"><animate attributeName="height" values="17.5;43.8;17.5" dur="2.6s" begin="-0.5s" repeatCount="indefinite" calcMode="spline" keyTimes="0;0.5;1" keySplines="0.4 0 0.6 1;0.4 0 0.6 1"/><animate attributeName="y" values="342.5;316.2;342.5" dur="2.6s" begin="-0.5s" repeatCount="indefinite" calcMode="spline" keyTimes="0;0.5;1" keySplines="0.4 0 0.6 1;0.4 0 0.6 1"/></rect>
+<rect x="1020.0" width="7" rx="1.5" fill="#845a8e" opacity="0.85"><animate attributeName="height" values="7.0;17.5;7.0" dur="2.6s" begin="-0.75s" repeatCount="indefinite" calcMode="spline" keyTimes="0;0.5;1" keySplines="0.4 0 0.6 1;0.4 0 0.6 1"/><animate attributeName="y" values="353.0;342.5;353.0" dur="2.6s" begin="-0.75s" repeatCount="indefinite" calcMode="spline" keyTimes="0;0.5;1" keySplines="0.4 0 0.6 1;0.4 0 0.6 1"/></rect>
+<rect x="1031.5" width="7" rx="1.5" fill="#845a8e" opacity="0.85"><animate attributeName="height" values="10.5;26.2;10.5" dur="2.6s" begin="-1.0s" repeatCount="indefinite" calcMode="spline" keyTimes="0;0.5;1" keySplines="0.4 0 0.6 1;0.4 0 0.6 1"/><animate attributeName="y" values="349.5;333.8;349.5" dur="2.6s" begin="-1.0s" repeatCount="indefinite" calcMode="spline" keyTimes="0;0.5;1" keySplines="0.4 0 0.6 1;0.4 0 0.6 1"/></rect>
+<rect x="1070" y="272" width="32" height="132" rx="4" fill="#efe7d4" stroke="#e0d4b6" stroke-width="1"/>
+<rect x="1070" width="32" rx="4" fill="#b3552c"><animate attributeName="height" values="100;108;100" dur="2.6s" repeatCount="indefinite" calcMode="spline" keyTimes="0;0.5;1" keySplines="0.4 0 0.6 1;0.4 0 0.6 1"/><animate attributeName="y" values="304;296;304" dur="2.6s" repeatCount="indefinite" calcMode="spline" keyTimes="0;0.5;1" keySplines="0.4 0 0.6 1;0.4 0 0.6 1"/></rect>
+<text x="1086" y="262" text-anchor="middle" font-size="11.5" font-weight="700" fill="#2c2722">action RMS</text>
+<text x="1086" y="424" text-anchor="middle" font-size="12.5" font-weight="700" fill="#b3552c">✓ 0.20</text>
+<text x="860" y="476" text-anchor="middle" font-size="12.5" fill="#2c2722">action gates the whole map &#8212; its influence persists</text>
+</svg>

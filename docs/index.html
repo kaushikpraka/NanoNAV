@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>NanoNAV — real-robot navigation with Nano World Models</title>
 <meta name="description" content="Latent-space planning with a Nano World Model drives a LeKiwi robot to goal images — learned from 25 minutes of driving, no maps, no depth, no pose.">
-<link rel="stylesheet" href="style.css?v=1782600889">
+<link rel="stylesheet" href="style.css?v=1782695385">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
 <script type="module" src="https://ajax.googleapis.com/ajax/libs/model-viewer/4.0.0/model-viewer.min.js"></script>
 </head>
@@ -110,7 +110,7 @@
 <p>Collection was entirely manual, using <strong>LeRobot's <code>record</code> pipeline</strong> to timestamp and synchronize the overhead camera with commanded base velocities at 30 Hz. For teleoperation, I connected a PS5 DualSense over USB to drive forward velocity on the left stick and yaw rate on the right, with no strafe binding so sideways velocity is zero by construction.</p>
 
 <figure>
-  <img src="assets/controller-setup.jpg?v=4838bbcc" alt="">
+  <img src="assets/controller-setup.jpg?v=de22e831" alt="">
   <figcaption><b>The full data-collection rig.</b> A PS5 DualSense wired over USB-C to the laptop, with the left stick mapped to forward velocity and the right to yaw rate. 25 minutes of driving with this produced the entire dataset.</figcaption>
 </figure>
 
@@ -295,7 +295,10 @@
 
 <p>Because the action now multiplicatively controls the scale of the entire feature map at every layer, the model cannot reduce its influence by tuning a weight toward zero. On the same semantic latents where additive injection collapsed to 0.0028 RMS, AdaLN held at 0.2 RMS.</p>
 
-<div class="pending"><b>Pending figure.</b> Additive injection (left) lets the model learn W→0, cutting the gradient path through the action. AdaLN (right) predicts the scale and shift of every LayerNorm from the action embedding, so the action multiplicatively gates the entire feature map. The model cannot suppress it without collapsing activations entirely, keeping the gradient path open throughout training.</div>
+<figure>
+  <img src="assets/injection_comparison.svg?v=5592d1bc" alt="">
+  <figcaption><b>Additive injection (left) lets the model learn W→0, cutting the gradient path through the action.</b> AdaLN (right) predicts the scale and shift of every LayerNorm from the action embedding, so the action multiplicatively gates the entire feature map. The model cannot suppress it without collapsing activations entirely, keeping the gradient path open throughout training.</figcaption>
+</figure>
 
 <p>In these videos the yellow arrow shows the action vector the robot executed. The goal image is shown as the 4th image in the sequence.</p>
 
