@@ -1,175 +1,166 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1160 632" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" role="img" aria-label="Diffusion forcing vs standard diffusion">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1160 518" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" role="img" aria-label="Diffusion forcing vs standard diffusion">
 <defs>
 <linearGradient id="card" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fdf7e9"/><stop offset="1" stop-color="#f6ecd2"/></linearGradient>
-<clipPath id="fclip"><rect width="138" height="96" rx="12"/></clipPath>
+<clipPath id="fclip"><rect width="138" height="92" rx="12"/></clipPath>
 <filter id="grain"><feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="3" seed="7" stitchTiles="stitch"/><feColorMatrix type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0.42 0.42 0.42 0 0"/></filter>
-<linearGradient id="nscale" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#efe2d2"/><stop offset="1" stop-color="#a8451f"/></linearGradient>
+<marker id="ah-c0613c" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto" markerUnits="userSpaceOnUse"><path d="M0,0 L7.5,3 L0,6 Z" fill="#c0613c"/></marker>
+<marker id="ah-7c7565" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto" markerUnits="userSpaceOnUse"><path d="M0,0 L7.5,3 L0,6 Z" fill="#7c7565"/></marker>
+<marker id="ah-b3552c" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto" markerUnits="userSpaceOnUse"><path d="M0,0 L7.5,3 L0,6 Z" fill="#b3552c"/></marker>
 </defs>
-<rect x="1" y="1" width="1158" height="630" rx="18" fill="url(#card)" stroke="#e7dcc0" stroke-width="1.5"/>
+<rect x="1" y="1" width="1158" height="516" rx="18" fill="url(#card)" stroke="#e7dcc0" stroke-width="1.5"/>
 <text x="580.0" y="36" text-anchor="middle" font-size="19" font-weight="700" fill="#2c2722">Diffusion Forcing vs Standard Diffusion</text>
-<text x="49" y="74" font-size="13.5" font-weight="700" fill="#2c2722">Standard Diffusion <tspan font-weight="400" fill="#7c7565" font-style="italic">— one shared noise level, denoised in lockstep</tspan></text>
-<g transform="translate(49,96)">
-<linearGradient id="gstd49" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#eee9de"/><stop offset="1" stop-color="#e3ddcc"/></linearGradient>
+<text x="126" y="68" font-size="14" font-weight="700" fill="#2c2722">Standard Diffusion <tspan font-weight="400" fill="#7c7565" font-style="italic">· one shared noise level for the whole sequence</tspan></text>
+<g transform="translate(126,84)">
+<linearGradient id="g12684" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#eee9de"/><stop offset="1" stop-color="#e3ddcc"/></linearGradient>
 <g clip-path="url(#fclip)">
-<rect width="138" height="96" fill="url(#gstd49)"/>
-<line x1="0" y1="60" x2="138" y2="60" stroke="#b3aa95" stroke-width="1.4" opacity="0.55"/>
-<circle cx="91" cy="38" r="11" fill="#b3aa95" opacity="0.9"/>
-<rect width="138" height="96" filter="url(#grain)" opacity="0.6"><animate attributeName="opacity" values="0.6;0.6;0.28;0.6;0.6" keyTimes="0;0.2;0.5;0.8;1" dur="4s" repeatCount="indefinite"/></rect>
+<rect width="138" height="92" fill="url(#g12684)"/>
+<line x1="0" y1="57" x2="138" y2="57" stroke="#b3aa95" stroke-width="1.4" opacity="0.55"/>
+<circle cx="91" cy="37" r="10" fill="#b3aa95" opacity="0.9"/>
+<rect width="138" height="92" filter="url(#grain)" opacity="0.820"><animate attributeName="opacity" values="0.82;0.82;0.04;0.04;0.82" keyTimes="0;0.10;0.52;0.84;1" dur="7.0s" repeatCount="indefinite" calcMode="spline" keySplines="0.4 0 0.6 1;0.4 0 0.6 1;0.4 0 0.6 1;0.4 0 0.6 1"/></rect>
 </g>
-<rect width="138" height="96" rx="12" fill="none" stroke="#a99f86" stroke-width="2"/>
-<text x="69.0" y="44" text-anchor="middle" font-size="18" font-style="italic" font-weight="600" fill="#2c2722" opacity="0.92">f1</text>
+<rect width="138" height="92" rx="12" fill="none" stroke="#cdbfa0" stroke-width="1.8"/>
+<text x="69.0" y="43" text-anchor="middle" font-size="16" font-style="italic" font-weight="600" fill="#5c5446" opacity="0.85">f1</text>
 </g>
-<g transform="translate(203,96)">
-<linearGradient id="gstd203" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#eee9de"/><stop offset="1" stop-color="#e3ddcc"/></linearGradient>
+<rect x="175.0" y="188.0" width="40" height="30.0" rx="2" fill="#c0613c" opacity="0.82"><animate attributeName="height" values="30.0;30.0;2.0;2.0;30.0" keyTimes="0;0.10;0.52;0.84;1" dur="7.0s" repeatCount="indefinite" calcMode="spline" keySplines="0.4 0 0.6 1;0.4 0 0.6 1;0.4 0 0.6 1;0.4 0 0.6 1"/><animate attributeName="y" values="188.0;188.0;216.0;216.0;188.0" keyTimes="0;0.10;0.52;0.84;1" dur="7.0s" repeatCount="indefinite" calcMode="spline" keySplines="0.4 0 0.6 1;0.4 0 0.6 1;0.4 0 0.6 1;0.4 0 0.6 1"/></rect>
+<g transform="translate(280,84)">
+<linearGradient id="g28084" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#eee9de"/><stop offset="1" stop-color="#e3ddcc"/></linearGradient>
 <g clip-path="url(#fclip)">
-<rect width="138" height="96" fill="url(#gstd203)"/>
-<line x1="0" y1="60" x2="138" y2="60" stroke="#b3aa95" stroke-width="1.4" opacity="0.55"/>
-<circle cx="91" cy="38" r="11" fill="#b3aa95" opacity="0.9"/>
-<rect width="138" height="96" filter="url(#grain)" opacity="0.6"><animate attributeName="opacity" values="0.6;0.6;0.28;0.6;0.6" keyTimes="0;0.2;0.5;0.8;1" dur="4s" repeatCount="indefinite"/></rect>
+<rect width="138" height="92" fill="url(#g28084)"/>
+<line x1="0" y1="57" x2="138" y2="57" stroke="#b3aa95" stroke-width="1.4" opacity="0.55"/>
+<circle cx="91" cy="37" r="10" fill="#b3aa95" opacity="0.9"/>
+<rect width="138" height="92" filter="url(#grain)" opacity="0.820"><animate attributeName="opacity" values="0.82;0.82;0.04;0.04;0.82" keyTimes="0;0.10;0.52;0.84;1" dur="7.0s" repeatCount="indefinite" calcMode="spline" keySplines="0.4 0 0.6 1;0.4 0 0.6 1;0.4 0 0.6 1;0.4 0 0.6 1"/></rect>
 </g>
-<rect width="138" height="96" rx="12" fill="none" stroke="#a99f86" stroke-width="2"/>
-<text x="69.0" y="44" text-anchor="middle" font-size="18" font-style="italic" font-weight="600" fill="#2c2722" opacity="0.92">f2</text>
+<rect width="138" height="92" rx="12" fill="none" stroke="#cdbfa0" stroke-width="1.8"/>
+<text x="69.0" y="43" text-anchor="middle" font-size="16" font-style="italic" font-weight="600" fill="#5c5446" opacity="0.85">f2</text>
 </g>
-<g transform="translate(357,96)">
-<linearGradient id="gstd357" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#eee9de"/><stop offset="1" stop-color="#e3ddcc"/></linearGradient>
+<rect x="329.0" y="188.0" width="40" height="30.0" rx="2" fill="#c0613c" opacity="0.82"><animate attributeName="height" values="30.0;30.0;2.0;2.0;30.0" keyTimes="0;0.10;0.52;0.84;1" dur="7.0s" repeatCount="indefinite" calcMode="spline" keySplines="0.4 0 0.6 1;0.4 0 0.6 1;0.4 0 0.6 1;0.4 0 0.6 1"/><animate attributeName="y" values="188.0;188.0;216.0;216.0;188.0" keyTimes="0;0.10;0.52;0.84;1" dur="7.0s" repeatCount="indefinite" calcMode="spline" keySplines="0.4 0 0.6 1;0.4 0 0.6 1;0.4 0 0.6 1;0.4 0 0.6 1"/></rect>
+<g transform="translate(434,84)">
+<linearGradient id="g43484" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#eee9de"/><stop offset="1" stop-color="#e3ddcc"/></linearGradient>
 <g clip-path="url(#fclip)">
-<rect width="138" height="96" fill="url(#gstd357)"/>
-<line x1="0" y1="60" x2="138" y2="60" stroke="#b3aa95" stroke-width="1.4" opacity="0.55"/>
-<circle cx="91" cy="38" r="11" fill="#b3aa95" opacity="0.9"/>
-<rect width="138" height="96" filter="url(#grain)" opacity="0.6"><animate attributeName="opacity" values="0.6;0.6;0.28;0.6;0.6" keyTimes="0;0.2;0.5;0.8;1" dur="4s" repeatCount="indefinite"/></rect>
+<rect width="138" height="92" fill="url(#g43484)"/>
+<line x1="0" y1="57" x2="138" y2="57" stroke="#b3aa95" stroke-width="1.4" opacity="0.55"/>
+<circle cx="91" cy="37" r="10" fill="#b3aa95" opacity="0.9"/>
+<rect width="138" height="92" filter="url(#grain)" opacity="0.820"><animate attributeName="opacity" values="0.82;0.82;0.04;0.04;0.82" keyTimes="0;0.10;0.52;0.84;1" dur="7.0s" repeatCount="indefinite" calcMode="spline" keySplines="0.4 0 0.6 1;0.4 0 0.6 1;0.4 0 0.6 1;0.4 0 0.6 1"/></rect>
 </g>
-<rect width="138" height="96" rx="12" fill="none" stroke="#a99f86" stroke-width="2"/>
-<text x="69.0" y="44" text-anchor="middle" font-size="18" font-style="italic" font-weight="600" fill="#2c2722" opacity="0.92">f3</text>
+<rect width="138" height="92" rx="12" fill="none" stroke="#cdbfa0" stroke-width="1.8"/>
+<text x="69.0" y="43" text-anchor="middle" font-size="16" font-style="italic" font-weight="600" fill="#5c5446" opacity="0.85">f3</text>
 </g>
-<g transform="translate(511,96)">
-<linearGradient id="gstd511" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#eee9de"/><stop offset="1" stop-color="#e3ddcc"/></linearGradient>
+<rect x="483.0" y="188.0" width="40" height="30.0" rx="2" fill="#c0613c" opacity="0.82"><animate attributeName="height" values="30.0;30.0;2.0;2.0;30.0" keyTimes="0;0.10;0.52;0.84;1" dur="7.0s" repeatCount="indefinite" calcMode="spline" keySplines="0.4 0 0.6 1;0.4 0 0.6 1;0.4 0 0.6 1;0.4 0 0.6 1"/><animate attributeName="y" values="188.0;188.0;216.0;216.0;188.0" keyTimes="0;0.10;0.52;0.84;1" dur="7.0s" repeatCount="indefinite" calcMode="spline" keySplines="0.4 0 0.6 1;0.4 0 0.6 1;0.4 0 0.6 1;0.4 0 0.6 1"/></rect>
+<g transform="translate(588,84)">
+<linearGradient id="g58884" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#eee9de"/><stop offset="1" stop-color="#e3ddcc"/></linearGradient>
 <g clip-path="url(#fclip)">
-<rect width="138" height="96" fill="url(#gstd511)"/>
-<line x1="0" y1="60" x2="138" y2="60" stroke="#b3aa95" stroke-width="1.4" opacity="0.55"/>
-<circle cx="91" cy="38" r="11" fill="#b3aa95" opacity="0.9"/>
-<rect width="138" height="96" filter="url(#grain)" opacity="0.6"><animate attributeName="opacity" values="0.6;0.6;0.28;0.6;0.6" keyTimes="0;0.2;0.5;0.8;1" dur="4s" repeatCount="indefinite"/></rect>
+<rect width="138" height="92" fill="url(#g58884)"/>
+<line x1="0" y1="57" x2="138" y2="57" stroke="#b3aa95" stroke-width="1.4" opacity="0.55"/>
+<circle cx="91" cy="37" r="10" fill="#b3aa95" opacity="0.9"/>
+<rect width="138" height="92" filter="url(#grain)" opacity="0.820"><animate attributeName="opacity" values="0.82;0.82;0.04;0.04;0.82" keyTimes="0;0.10;0.52;0.84;1" dur="7.0s" repeatCount="indefinite" calcMode="spline" keySplines="0.4 0 0.6 1;0.4 0 0.6 1;0.4 0 0.6 1;0.4 0 0.6 1"/></rect>
 </g>
-<rect width="138" height="96" rx="12" fill="none" stroke="#a99f86" stroke-width="2"/>
-<text x="69.0" y="44" text-anchor="middle" font-size="18" font-style="italic" font-weight="600" fill="#2c2722" opacity="0.92">f4</text>
+<rect width="138" height="92" rx="12" fill="none" stroke="#cdbfa0" stroke-width="1.8"/>
+<text x="69.0" y="43" text-anchor="middle" font-size="16" font-style="italic" font-weight="600" fill="#5c5446" opacity="0.85">f4</text>
 </g>
-<g transform="translate(665,96)">
-<linearGradient id="gstd665" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#eee9de"/><stop offset="1" stop-color="#e3ddcc"/></linearGradient>
+<rect x="637.0" y="188.0" width="40" height="30.0" rx="2" fill="#c0613c" opacity="0.82"><animate attributeName="height" values="30.0;30.0;2.0;2.0;30.0" keyTimes="0;0.10;0.52;0.84;1" dur="7.0s" repeatCount="indefinite" calcMode="spline" keySplines="0.4 0 0.6 1;0.4 0 0.6 1;0.4 0 0.6 1;0.4 0 0.6 1"/><animate attributeName="y" values="188.0;188.0;216.0;216.0;188.0" keyTimes="0;0.10;0.52;0.84;1" dur="7.0s" repeatCount="indefinite" calcMode="spline" keySplines="0.4 0 0.6 1;0.4 0 0.6 1;0.4 0 0.6 1;0.4 0 0.6 1"/></rect>
+<g transform="translate(742,84)">
+<linearGradient id="g74284" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#eee9de"/><stop offset="1" stop-color="#e3ddcc"/></linearGradient>
 <g clip-path="url(#fclip)">
-<rect width="138" height="96" fill="url(#gstd665)"/>
-<line x1="0" y1="60" x2="138" y2="60" stroke="#b3aa95" stroke-width="1.4" opacity="0.55"/>
-<circle cx="91" cy="38" r="11" fill="#b3aa95" opacity="0.9"/>
-<rect width="138" height="96" filter="url(#grain)" opacity="0.6"><animate attributeName="opacity" values="0.6;0.6;0.28;0.6;0.6" keyTimes="0;0.2;0.5;0.8;1" dur="4s" repeatCount="indefinite"/></rect>
+<rect width="138" height="92" fill="url(#g74284)"/>
+<line x1="0" y1="57" x2="138" y2="57" stroke="#b3aa95" stroke-width="1.4" opacity="0.55"/>
+<circle cx="91" cy="37" r="10" fill="#b3aa95" opacity="0.9"/>
+<rect width="138" height="92" filter="url(#grain)" opacity="0.820"><animate attributeName="opacity" values="0.82;0.82;0.04;0.04;0.82" keyTimes="0;0.10;0.52;0.84;1" dur="7.0s" repeatCount="indefinite" calcMode="spline" keySplines="0.4 0 0.6 1;0.4 0 0.6 1;0.4 0 0.6 1;0.4 0 0.6 1"/></rect>
 </g>
-<rect width="138" height="96" rx="12" fill="none" stroke="#a99f86" stroke-width="2"/>
-<text x="69.0" y="44" text-anchor="middle" font-size="18" font-style="italic" font-weight="600" fill="#2c2722" opacity="0.92">f5</text>
+<rect width="138" height="92" rx="12" fill="none" stroke="#cdbfa0" stroke-width="1.8"/>
+<text x="69.0" y="43" text-anchor="middle" font-size="16" font-style="italic" font-weight="600" fill="#5c5446" opacity="0.85">f5</text>
 </g>
-<g transform="translate(819,96)">
-<linearGradient id="gstd819" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#eee9de"/><stop offset="1" stop-color="#e3ddcc"/></linearGradient>
+<rect x="791.0" y="188.0" width="40" height="30.0" rx="2" fill="#c0613c" opacity="0.82"><animate attributeName="height" values="30.0;30.0;2.0;2.0;30.0" keyTimes="0;0.10;0.52;0.84;1" dur="7.0s" repeatCount="indefinite" calcMode="spline" keySplines="0.4 0 0.6 1;0.4 0 0.6 1;0.4 0 0.6 1;0.4 0 0.6 1"/><animate attributeName="y" values="188.0;188.0;216.0;216.0;188.0" keyTimes="0;0.10;0.52;0.84;1" dur="7.0s" repeatCount="indefinite" calcMode="spline" keySplines="0.4 0 0.6 1;0.4 0 0.6 1;0.4 0 0.6 1;0.4 0 0.6 1"/></rect>
+<g transform="translate(896,84)">
+<linearGradient id="g89684" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#eee9de"/><stop offset="1" stop-color="#e3ddcc"/></linearGradient>
 <g clip-path="url(#fclip)">
-<rect width="138" height="96" fill="url(#gstd819)"/>
-<line x1="0" y1="60" x2="138" y2="60" stroke="#b3aa95" stroke-width="1.4" opacity="0.55"/>
-<circle cx="91" cy="38" r="11" fill="#b3aa95" opacity="0.9"/>
-<rect width="138" height="96" filter="url(#grain)" opacity="0.6"><animate attributeName="opacity" values="0.6;0.6;0.28;0.6;0.6" keyTimes="0;0.2;0.5;0.8;1" dur="4s" repeatCount="indefinite"/></rect>
+<rect width="138" height="92" fill="url(#g89684)"/>
+<line x1="0" y1="57" x2="138" y2="57" stroke="#b3aa95" stroke-width="1.4" opacity="0.55"/>
+<circle cx="91" cy="37" r="10" fill="#b3aa95" opacity="0.9"/>
+<rect width="138" height="92" filter="url(#grain)" opacity="0.820"><animate attributeName="opacity" values="0.82;0.82;0.04;0.04;0.82" keyTimes="0;0.10;0.52;0.84;1" dur="7.0s" repeatCount="indefinite" calcMode="spline" keySplines="0.4 0 0.6 1;0.4 0 0.6 1;0.4 0 0.6 1;0.4 0 0.6 1"/></rect>
 </g>
-<rect width="138" height="96" rx="12" fill="none" stroke="#a99f86" stroke-width="2"/>
-<text x="69.0" y="44" text-anchor="middle" font-size="18" font-style="italic" font-weight="600" fill="#2c2722" opacity="0.92">f6</text>
+<rect width="138" height="92" rx="12" fill="none" stroke="#cdbfa0" stroke-width="1.8"/>
+<text x="69.0" y="43" text-anchor="middle" font-size="16" font-style="italic" font-weight="600" fill="#5c5446" opacity="0.85">f6</text>
 </g>
-<rect x="96.0" width="44" rx="2" fill="#c0613c" opacity="0.82"><animate attributeName="height" values="22;22;10;22;22" keyTimes="0;0.2;0.5;0.8;1" dur="4s" repeatCount="indefinite"/><animate attributeName="y" values="218;218;230;218;218" keyTimes="0;0.2;0.5;0.8;1" dur="4s" repeatCount="indefinite"/></rect>
-<text x="118.0" y="258" text-anchor="middle" font-size="11.5" fill="#c0613c">σ = 0.6</text>
-<rect x="250.0" width="44" rx="2" fill="#c0613c" opacity="0.82"><animate attributeName="height" values="22;22;10;22;22" keyTimes="0;0.2;0.5;0.8;1" dur="4s" repeatCount="indefinite"/><animate attributeName="y" values="218;218;230;218;218" keyTimes="0;0.2;0.5;0.8;1" dur="4s" repeatCount="indefinite"/></rect>
-<text x="272.0" y="258" text-anchor="middle" font-size="11.5" fill="#c0613c">σ = 0.6</text>
-<rect x="404.0" width="44" rx="2" fill="#c0613c" opacity="0.82"><animate attributeName="height" values="22;22;10;22;22" keyTimes="0;0.2;0.5;0.8;1" dur="4s" repeatCount="indefinite"/><animate attributeName="y" values="218;218;230;218;218" keyTimes="0;0.2;0.5;0.8;1" dur="4s" repeatCount="indefinite"/></rect>
-<text x="426.0" y="258" text-anchor="middle" font-size="11.5" fill="#c0613c">σ = 0.6</text>
-<rect x="558.0" width="44" rx="2" fill="#c0613c" opacity="0.82"><animate attributeName="height" values="22;22;10;22;22" keyTimes="0;0.2;0.5;0.8;1" dur="4s" repeatCount="indefinite"/><animate attributeName="y" values="218;218;230;218;218" keyTimes="0;0.2;0.5;0.8;1" dur="4s" repeatCount="indefinite"/></rect>
-<text x="580.0" y="258" text-anchor="middle" font-size="11.5" fill="#c0613c">σ = 0.6</text>
-<rect x="712.0" width="44" rx="2" fill="#c0613c" opacity="0.82"><animate attributeName="height" values="22;22;10;22;22" keyTimes="0;0.2;0.5;0.8;1" dur="4s" repeatCount="indefinite"/><animate attributeName="y" values="218;218;230;218;218" keyTimes="0;0.2;0.5;0.8;1" dur="4s" repeatCount="indefinite"/></rect>
-<text x="734.0" y="258" text-anchor="middle" font-size="11.5" fill="#c0613c">σ = 0.6</text>
-<rect x="866.0" width="44" rx="2" fill="#c0613c" opacity="0.82"><animate attributeName="height" values="22;22;10;22;22" keyTimes="0;0.2;0.5;0.8;1" dur="4s" repeatCount="indefinite"/><animate attributeName="y" values="218;218;230;218;218" keyTimes="0;0.2;0.5;0.8;1" dur="4s" repeatCount="indefinite"/></rect>
-<text x="888.0" y="258" text-anchor="middle" font-size="11.5" fill="#c0613c">σ = 0.6</text>
-<text x="39" y="232" text-anchor="end" font-size="10.5" font-style="italic" fill="#c0613c">noise</text>
-<line x1="40" y1="324" x2="1120" y2="324" stroke="#e7dcc0" stroke-width="1.3"/>
-<text x="49" y="350" font-size="13.5" font-weight="700" fill="#2c2722">Diffusion Forcing <tspan font-weight="400" fill="#7c7565" font-style="italic">— an independent noise level per frame</tspan></text>
-<g transform="translate(49,372)">
-<linearGradient id="gstd49" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#eee9de"/><stop offset="1" stop-color="#e3ddcc"/></linearGradient>
+<rect x="945.0" y="188.0" width="40" height="30.0" rx="2" fill="#c0613c" opacity="0.82"><animate attributeName="height" values="30.0;30.0;2.0;2.0;30.0" keyTimes="0;0.10;0.52;0.84;1" dur="7.0s" repeatCount="indefinite" calcMode="spline" keySplines="0.4 0 0.6 1;0.4 0 0.6 1;0.4 0 0.6 1;0.4 0 0.6 1"/><animate attributeName="y" values="188.0;188.0;216.0;216.0;188.0" keyTimes="0;0.10;0.52;0.84;1" dur="7.0s" repeatCount="indefinite" calcMode="spline" keySplines="0.4 0 0.6 1;0.4 0 0.6 1;0.4 0 0.6 1;0.4 0 0.6 1"/></rect>
+<text x="1030" y="68" text-anchor="end" font-size="11" font-style="italic" fill="#c0613c">denoise k = K &#8594; k = 0, all frames together</text>
+<text x="580.0" y="240" text-anchor="middle" font-size="12" fill="#2c2722">The whole window denoises in lockstep, so a new frame cannot be added without denoising the entire sequence again.</text>
+<line x1="40" y1="258" x2="1120" y2="258" stroke="#e7dcc0" stroke-width="1.3"/>
+<text x="126" y="284" font-size="14" font-weight="700" fill="#2c2722">Diffusion Forcing <tspan font-weight="400" fill="#7c7565" font-style="italic">· an independent noise level per frame</tspan></text>
+<g transform="translate(126,322)">
+<linearGradient id="g126322" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#eee9de"/><stop offset="1" stop-color="#e3ddcc"/></linearGradient>
 <g clip-path="url(#fclip)">
-<rect width="138" height="96" fill="url(#gstd49)"/>
-<line x1="0" y1="60" x2="138" y2="60" stroke="#b3aa95" stroke-width="1.4" opacity="0.55"/>
-<circle cx="91" cy="38" r="11" fill="#b3aa95" opacity="0.9"/>
-<rect width="138" height="96" filter="url(#grain)" opacity="0.06559999999999999"><animate attributeName="opacity" values="0.066;0.451;0.066" dur="3.0s" begin="-0.0s" repeatCount="indefinite" calcMode="spline" keyTimes="0;0.5;1" keySplines="0.4 0 0.6 1;0.4 0 0.6 1"/></rect>
+<rect width="138" height="92" fill="url(#g126322)"/>
+<line x1="0" y1="57" x2="138" y2="57" stroke="#b3aa95" stroke-width="1.4" opacity="0.55"/>
+<circle cx="91" cy="37" r="10" fill="#b3aa95" opacity="0.9"/>
+<rect width="138" height="92" filter="url(#grain)" opacity="0.820"><animate attributeName="opacity" values="0.82;0.82;0.04;0.04;0.82" keyTimes="0;0.060;0.230;0.9;1" dur="7.0s" repeatCount="indefinite" calcMode="spline" keySplines="0.4 0 0.6 1;0.4 0 0.6 1;0.4 0 0.6 1;0.4 0 0.6 1"/></rect>
 </g>
-<rect width="138" height="96" rx="12" fill="none" stroke="#a99f86" stroke-width="2"/>
-<text x="69.0" y="44" text-anchor="middle" font-size="18" font-style="italic" font-weight="600" fill="#2c2722" opacity="0.92">f1</text>
+<rect width="138" height="92" rx="12" fill="none" stroke="#cdbfa0" stroke-width="1.8"/>
+<text x="69.0" y="43" text-anchor="middle" font-size="16" font-style="italic" font-weight="600" fill="#5c5446" opacity="0.85">f1</text>
 </g>
-<rect x="96.0" width="44" rx="2" fill="#c0613c" opacity="0.82"><animate attributeName="height" values="3.4;23.1;3.4" dur="3.0s" begin="-0.0s" repeatCount="indefinite" calcMode="spline" keyTimes="0;0.5;1" keySplines="0.4 0 0.6 1;0.4 0 0.6 1"/><animate attributeName="y" values="512.6;492.9;512.6" dur="3.0s" begin="-0.0s" repeatCount="indefinite" calcMode="spline" keyTimes="0;0.5;1" keySplines="0.4 0 0.6 1;0.4 0 0.6 1"/></rect>
-<text x="118.0" y="534" text-anchor="middle" font-size="11.5" fill="#c0613c">σ<tspan baseline-shift="sub" font-size="8">1</tspan></text>
-<g transform="translate(203,372)">
-<linearGradient id="gstd203" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#eee9de"/><stop offset="1" stop-color="#e3ddcc"/></linearGradient>
+<rect x="175.0" y="426.0" width="40" height="30.0" rx="2" fill="#c0613c" opacity="0.82"><animate attributeName="height" values="30.0;30.0;2.0;2.0;30.0" keyTimes="0;0.060;0.230;0.9;1" dur="7.0s" repeatCount="indefinite" calcMode="spline" keySplines="0.4 0 0.6 1;0.4 0 0.6 1;0.4 0 0.6 1;0.4 0 0.6 1"/><animate attributeName="y" values="426.0;426.0;454.0;454.0;426.0" keyTimes="0;0.060;0.230;0.9;1" dur="7.0s" repeatCount="indefinite" calcMode="spline" keySplines="0.4 0 0.6 1;0.4 0 0.6 1;0.4 0 0.6 1;0.4 0 0.6 1"/></rect>
+<g transform="translate(280,322)">
+<linearGradient id="g280322" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#eee9de"/><stop offset="1" stop-color="#e3ddcc"/></linearGradient>
 <g clip-path="url(#fclip)">
-<rect width="138" height="96" fill="url(#gstd203)"/>
-<line x1="0" y1="60" x2="138" y2="60" stroke="#b3aa95" stroke-width="1.4" opacity="0.55"/>
-<circle cx="91" cy="38" r="11" fill="#b3aa95" opacity="0.9"/>
-<rect width="138" height="96" filter="url(#grain)" opacity="0.5084"><animate attributeName="opacity" values="0.508;0.820;0.508" dur="4.2s" begin="-1.1s" repeatCount="indefinite" calcMode="spline" keyTimes="0;0.5;1" keySplines="0.4 0 0.6 1;0.4 0 0.6 1"/></rect>
+<rect width="138" height="92" fill="url(#g280322)"/>
+<line x1="0" y1="57" x2="138" y2="57" stroke="#b3aa95" stroke-width="1.4" opacity="0.55"/>
+<circle cx="91" cy="37" r="10" fill="#b3aa95" opacity="0.9"/>
+<rect width="138" height="92" filter="url(#grain)" opacity="0.820"><animate attributeName="opacity" values="0.82;0.82;0.04;0.04;0.82" keyTimes="0;0.165;0.335;0.9;1" dur="7.0s" repeatCount="indefinite" calcMode="spline" keySplines="0.4 0 0.6 1;0.4 0 0.6 1;0.4 0 0.6 1;0.4 0 0.6 1"/></rect>
 </g>
-<rect width="138" height="96" rx="12" fill="none" stroke="#a99f86" stroke-width="2"/>
-<text x="69.0" y="44" text-anchor="middle" font-size="18" font-style="italic" font-weight="600" fill="#2c2722" opacity="0.92">f2</text>
+<rect width="138" height="92" rx="12" fill="none" stroke="#cdbfa0" stroke-width="1.8"/>
+<text x="69.0" y="43" text-anchor="middle" font-size="16" font-style="italic" font-weight="600" fill="#5c5446" opacity="0.85">f2</text>
 </g>
-<rect x="250.0" width="44" rx="2" fill="#c0613c" opacity="0.82"><animate attributeName="height" values="26.0;42.0;26.0" dur="4.2s" begin="-1.1s" repeatCount="indefinite" calcMode="spline" keyTimes="0;0.5;1" keySplines="0.4 0 0.6 1;0.4 0 0.6 1"/><animate attributeName="y" values="490.0;474.0;490.0" dur="4.2s" begin="-1.1s" repeatCount="indefinite" calcMode="spline" keyTimes="0;0.5;1" keySplines="0.4 0 0.6 1;0.4 0 0.6 1"/></rect>
-<text x="272.0" y="534" text-anchor="middle" font-size="11.5" fill="#c0613c">σ<tspan baseline-shift="sub" font-size="8">2</tspan></text>
-<g transform="translate(357,372)">
-<linearGradient id="gstd357" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#eee9de"/><stop offset="1" stop-color="#e3ddcc"/></linearGradient>
+<rect x="329.0" y="426.0" width="40" height="30.0" rx="2" fill="#c0613c" opacity="0.82"><animate attributeName="height" values="30.0;30.0;2.0;2.0;30.0" keyTimes="0;0.165;0.335;0.9;1" dur="7.0s" repeatCount="indefinite" calcMode="spline" keySplines="0.4 0 0.6 1;0.4 0 0.6 1;0.4 0 0.6 1;0.4 0 0.6 1"/><animate attributeName="y" values="426.0;426.0;454.0;454.0;426.0" keyTimes="0;0.165;0.335;0.9;1" dur="7.0s" repeatCount="indefinite" calcMode="spline" keySplines="0.4 0 0.6 1;0.4 0 0.6 1;0.4 0 0.6 1;0.4 0 0.6 1"/></rect>
+<g transform="translate(434,322)">
+<linearGradient id="g434322" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#eee9de"/><stop offset="1" stop-color="#e3ddcc"/></linearGradient>
 <g clip-path="url(#fclip)">
-<rect width="138" height="96" fill="url(#gstd357)"/>
-<line x1="0" y1="60" x2="138" y2="60" stroke="#b3aa95" stroke-width="1.4" opacity="0.55"/>
-<circle cx="91" cy="38" r="11" fill="#b3aa95" opacity="0.9"/>
-<rect width="138" height="96" filter="url(#grain)" opacity="0.0"><animate attributeName="opacity" values="0.000;0.230;0.000" dur="2.4s" begin="-0.6s" repeatCount="indefinite" calcMode="spline" keyTimes="0;0.5;1" keySplines="0.4 0 0.6 1;0.4 0 0.6 1"/></rect>
+<rect width="138" height="92" fill="url(#g434322)"/>
+<line x1="0" y1="57" x2="138" y2="57" stroke="#b3aa95" stroke-width="1.4" opacity="0.55"/>
+<circle cx="91" cy="37" r="10" fill="#b3aa95" opacity="0.9"/>
+<rect width="138" height="92" filter="url(#grain)" opacity="0.820"><animate attributeName="opacity" values="0.82;0.82;0.04;0.04;0.82" keyTimes="0;0.270;0.440;0.9;1" dur="7.0s" repeatCount="indefinite" calcMode="spline" keySplines="0.4 0 0.6 1;0.4 0 0.6 1;0.4 0 0.6 1;0.4 0 0.6 1"/></rect>
 </g>
-<rect width="138" height="96" rx="12" fill="none" stroke="#a99f86" stroke-width="2"/>
-<text x="69.0" y="44" text-anchor="middle" font-size="18" font-style="italic" font-weight="600" fill="#2c2722" opacity="0.92">f3</text>
+<rect width="138" height="92" rx="12" fill="none" stroke="#cdbfa0" stroke-width="1.8"/>
+<text x="69.0" y="43" text-anchor="middle" font-size="16" font-style="italic" font-weight="600" fill="#5c5446" opacity="0.85">f3</text>
 </g>
-<rect x="404.0" width="44" rx="2" fill="#c0613c" opacity="0.82"><animate attributeName="height" values="0.0;11.8;0.0" dur="2.4s" begin="-0.6s" repeatCount="indefinite" calcMode="spline" keyTimes="0;0.5;1" keySplines="0.4 0 0.6 1;0.4 0 0.6 1"/><animate attributeName="y" values="516.0;504.2;516.0" dur="2.4s" begin="-0.6s" repeatCount="indefinite" calcMode="spline" keyTimes="0;0.5;1" keySplines="0.4 0 0.6 1;0.4 0 0.6 1"/></rect>
-<text x="426.0" y="534" text-anchor="middle" font-size="11.5" fill="#c0613c">σ<tspan baseline-shift="sub" font-size="8">3</tspan></text>
-<g transform="translate(511,372)">
-<linearGradient id="gstd511" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#eee9de"/><stop offset="1" stop-color="#e3ddcc"/></linearGradient>
+<rect x="483.0" y="426.0" width="40" height="30.0" rx="2" fill="#c0613c" opacity="0.82"><animate attributeName="height" values="30.0;30.0;2.0;2.0;30.0" keyTimes="0;0.270;0.440;0.9;1" dur="7.0s" repeatCount="indefinite" calcMode="spline" keySplines="0.4 0 0.6 1;0.4 0 0.6 1;0.4 0 0.6 1;0.4 0 0.6 1"/><animate attributeName="y" values="426.0;426.0;454.0;454.0;426.0" keyTimes="0;0.270;0.440;0.9;1" dur="7.0s" repeatCount="indefinite" calcMode="spline" keySplines="0.4 0 0.6 1;0.4 0 0.6 1;0.4 0 0.6 1;0.4 0 0.6 1"/></rect>
+<g transform="translate(588,322)">
+<linearGradient id="g588322" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#eee9de"/><stop offset="1" stop-color="#e3ddcc"/></linearGradient>
 <g clip-path="url(#fclip)">
-<rect width="138" height="96" fill="url(#gstd511)"/>
-<line x1="0" y1="60" x2="138" y2="60" stroke="#b3aa95" stroke-width="1.4" opacity="0.55"/>
-<circle cx="91" cy="38" r="11" fill="#b3aa95" opacity="0.9"/>
-<rect width="138" height="96" filter="url(#grain)" opacity="0.2788"><animate attributeName="opacity" values="0.279;0.672;0.279" dur="3.6s" begin="-2.0s" repeatCount="indefinite" calcMode="spline" keyTimes="0;0.5;1" keySplines="0.4 0 0.6 1;0.4 0 0.6 1"/></rect>
+<rect width="138" height="92" fill="url(#g588322)"/>
+<line x1="0" y1="57" x2="138" y2="57" stroke="#b3aa95" stroke-width="1.4" opacity="0.55"/>
+<circle cx="91" cy="37" r="10" fill="#b3aa95" opacity="0.9"/>
+<rect width="138" height="92" filter="url(#grain)" opacity="0.820"><animate attributeName="opacity" values="0.82;0.82;0.04;0.04;0.82" keyTimes="0;0.375;0.545;0.9;1" dur="7.0s" repeatCount="indefinite" calcMode="spline" keySplines="0.4 0 0.6 1;0.4 0 0.6 1;0.4 0 0.6 1;0.4 0 0.6 1"/></rect>
 </g>
-<rect width="138" height="96" rx="12" fill="none" stroke="#a99f86" stroke-width="2"/>
-<text x="69.0" y="44" text-anchor="middle" font-size="18" font-style="italic" font-weight="600" fill="#2c2722" opacity="0.92">f4</text>
+<rect width="138" height="92" rx="12" fill="none" stroke="#cdbfa0" stroke-width="1.8"/>
+<text x="69.0" y="43" text-anchor="middle" font-size="16" font-style="italic" font-weight="600" fill="#5c5446" opacity="0.85">f4</text>
 </g>
-<rect x="558.0" width="44" rx="2" fill="#c0613c" opacity="0.82"><animate attributeName="height" values="14.3;34.4;14.3" dur="3.6s" begin="-2.0s" repeatCount="indefinite" calcMode="spline" keyTimes="0;0.5;1" keySplines="0.4 0 0.6 1;0.4 0 0.6 1"/><animate attributeName="y" values="501.7;481.6;501.7" dur="3.6s" begin="-2.0s" repeatCount="indefinite" calcMode="spline" keyTimes="0;0.5;1" keySplines="0.4 0 0.6 1;0.4 0 0.6 1"/></rect>
-<text x="580.0" y="534" text-anchor="middle" font-size="11.5" fill="#c0613c">σ<tspan baseline-shift="sub" font-size="8">4</tspan></text>
-<g transform="translate(665,372)">
-<linearGradient id="gstd665" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#eee9de"/><stop offset="1" stop-color="#e3ddcc"/></linearGradient>
+<rect x="637.0" y="426.0" width="40" height="30.0" rx="2" fill="#c0613c" opacity="0.82"><animate attributeName="height" values="30.0;30.0;2.0;2.0;30.0" keyTimes="0;0.375;0.545;0.9;1" dur="7.0s" repeatCount="indefinite" calcMode="spline" keySplines="0.4 0 0.6 1;0.4 0 0.6 1;0.4 0 0.6 1;0.4 0 0.6 1"/><animate attributeName="y" values="426.0;426.0;454.0;454.0;426.0" keyTimes="0;0.375;0.545;0.9;1" dur="7.0s" repeatCount="indefinite" calcMode="spline" keySplines="0.4 0 0.6 1;0.4 0 0.6 1;0.4 0 0.6 1;0.4 0 0.6 1"/></rect>
+<g transform="translate(742,322)">
+<linearGradient id="g742322" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#eee9de"/><stop offset="1" stop-color="#e3ddcc"/></linearGradient>
 <g clip-path="url(#fclip)">
-<rect width="138" height="96" fill="url(#gstd665)"/>
-<line x1="0" y1="60" x2="138" y2="60" stroke="#b3aa95" stroke-width="1.4" opacity="0.55"/>
-<circle cx="91" cy="38" r="11" fill="#b3aa95" opacity="0.9"/>
-<rect width="138" height="96" filter="url(#grain)" opacity="0.14759999999999998"><animate attributeName="opacity" values="0.148;0.754;0.148" dur="5.0s" begin="-0.4s" repeatCount="indefinite" calcMode="spline" keyTimes="0;0.5;1" keySplines="0.4 0 0.6 1;0.4 0 0.6 1"/></rect>
+<rect width="138" height="92" fill="url(#g742322)"/>
+<line x1="0" y1="57" x2="138" y2="57" stroke="#b3aa95" stroke-width="1.4" opacity="0.55"/>
+<circle cx="91" cy="37" r="10" fill="#b3aa95" opacity="0.9"/>
+<rect width="138" height="92" filter="url(#grain)" opacity="0.820"><animate attributeName="opacity" values="0.82;0.82;0.04;0.04;0.82" keyTimes="0;0.480;0.650;0.9;1" dur="7.0s" repeatCount="indefinite" calcMode="spline" keySplines="0.4 0 0.6 1;0.4 0 0.6 1;0.4 0 0.6 1;0.4 0 0.6 1"/></rect>
 </g>
-<rect width="138" height="96" rx="12" fill="none" stroke="#a99f86" stroke-width="2"/>
-<text x="69.0" y="44" text-anchor="middle" font-size="18" font-style="italic" font-weight="600" fill="#2c2722" opacity="0.92">f5</text>
+<rect width="138" height="92" rx="12" fill="none" stroke="#cdbfa0" stroke-width="1.8"/>
+<text x="69.0" y="43" text-anchor="middle" font-size="16" font-style="italic" font-weight="600" fill="#5c5446" opacity="0.85">f5</text>
 </g>
-<rect x="712.0" width="44" rx="2" fill="#c0613c" opacity="0.82"><animate attributeName="height" values="7.6;38.6;7.6" dur="5.0s" begin="-0.4s" repeatCount="indefinite" calcMode="spline" keyTimes="0;0.5;1" keySplines="0.4 0 0.6 1;0.4 0 0.6 1"/><animate attributeName="y" values="508.4;477.4;508.4" dur="5.0s" begin="-0.4s" repeatCount="indefinite" calcMode="spline" keyTimes="0;0.5;1" keySplines="0.4 0 0.6 1;0.4 0 0.6 1"/></rect>
-<text x="734.0" y="534" text-anchor="middle" font-size="11.5" fill="#c0613c">σ<tspan baseline-shift="sub" font-size="8">5</tspan></text>
-<g transform="translate(819,372)">
-<linearGradient id="gstd819" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#eee9de"/><stop offset="1" stop-color="#e3ddcc"/></linearGradient>
+<rect x="791.0" y="426.0" width="40" height="30.0" rx="2" fill="#c0613c" opacity="0.82"><animate attributeName="height" values="30.0;30.0;2.0;2.0;30.0" keyTimes="0;0.480;0.650;0.9;1" dur="7.0s" repeatCount="indefinite" calcMode="spline" keySplines="0.4 0 0.6 1;0.4 0 0.6 1;0.4 0 0.6 1;0.4 0 0.6 1"/><animate attributeName="y" values="426.0;426.0;454.0;454.0;426.0" keyTimes="0;0.480;0.650;0.9;1" dur="7.0s" repeatCount="indefinite" calcMode="spline" keySplines="0.4 0 0.6 1;0.4 0 0.6 1;0.4 0 0.6 1;0.4 0 0.6 1"/></rect>
+<g transform="translate(896,322)">
+<linearGradient id="g896322" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#eee9de"/><stop offset="1" stop-color="#e3ddcc"/></linearGradient>
 <g clip-path="url(#fclip)">
-<rect width="138" height="96" fill="url(#gstd819)"/>
-<line x1="0" y1="60" x2="138" y2="60" stroke="#b3aa95" stroke-width="1.4" opacity="0.55"/>
-<circle cx="91" cy="38" r="11" fill="#b3aa95" opacity="0.9"/>
-<rect width="138" height="96" filter="url(#grain)" opacity="0.3772"><animate attributeName="opacity" values="0.377;0.787;0.377" dur="2.8s" begin="-1.7s" repeatCount="indefinite" calcMode="spline" keyTimes="0;0.5;1" keySplines="0.4 0 0.6 1;0.4 0 0.6 1"/></rect>
+<rect width="138" height="92" fill="url(#g896322)"/>
+<line x1="0" y1="57" x2="138" y2="57" stroke="#b3aa95" stroke-width="1.4" opacity="0.55"/>
+<circle cx="91" cy="37" r="10" fill="#b3aa95" opacity="0.9"/>
+<rect width="138" height="92" filter="url(#grain)" opacity="0.820"><animate attributeName="opacity" values="0.82;0.82;0.04;0.04;0.82" keyTimes="0;0.585;0.755;0.9;1" dur="7.0s" repeatCount="indefinite" calcMode="spline" keySplines="0.4 0 0.6 1;0.4 0 0.6 1;0.4 0 0.6 1;0.4 0 0.6 1"/></rect>
 </g>
-<rect width="138" height="96" rx="12" fill="none" stroke="#a99f86" stroke-width="2"/>
-<text x="69.0" y="44" text-anchor="middle" font-size="18" font-style="italic" font-weight="600" fill="#2c2722" opacity="0.92">f6</text>
+<rect width="138" height="92" rx="12" fill="none" stroke="#cdbfa0" stroke-width="1.8"/>
+<text x="69.0" y="43" text-anchor="middle" font-size="16" font-style="italic" font-weight="600" fill="#5c5446" opacity="0.85">f6</text>
 </g>
-<rect x="866.0" width="44" rx="2" fill="#c0613c" opacity="0.82"><animate attributeName="height" values="19.3;40.3;19.3" dur="2.8s" begin="-1.7s" repeatCount="indefinite" calcMode="spline" keyTimes="0;0.5;1" keySplines="0.4 0 0.6 1;0.4 0 0.6 1"/><animate attributeName="y" values="496.7;475.7;496.7" dur="2.8s" begin="-1.7s" repeatCount="indefinite" calcMode="spline" keyTimes="0;0.5;1" keySplines="0.4 0 0.6 1;0.4 0 0.6 1"/></rect>
-<text x="888.0" y="534" text-anchor="middle" font-size="11.5" fill="#c0613c">σ<tspan baseline-shift="sub" font-size="8">6</tspan></text>
-<text x="39" y="508" text-anchor="end" font-size="10.5" font-style="italic" fill="#c0613c">noise</text>
-<text x="957" y="350" text-anchor="end" font-size="11" font-style="italic" fill="#7c7565">clean frames can be context while the next is denoised</text>
-<text x="493" y="617" text-anchor="end" font-size="12" fill="#2c2722">σ = 0 clean</text>
-<rect x="505" y="606" width="150" height="14" rx="3" fill="url(#nscale)" stroke="#d8c7ab" stroke-width="1"/>
-<text x="667" y="617" font-size="12" fill="#2c2722">σ = 1 noisy</text>
+<rect x="945.0" y="426.0" width="40" height="30.0" rx="2" fill="#c0613c" opacity="0.82"><animate attributeName="height" values="30.0;30.0;2.0;2.0;30.0" keyTimes="0;0.585;0.755;0.9;1" dur="7.0s" repeatCount="indefinite" calcMode="spline" keySplines="0.4 0 0.6 1;0.4 0 0.6 1;0.4 0 0.6 1;0.4 0 0.6 1"/><animate attributeName="y" values="426.0;426.0;454.0;454.0;426.0" keyTimes="0;0.585;0.755;0.9;1" dur="7.0s" repeatCount="indefinite" calcMode="spline" keySplines="0.4 0 0.6 1;0.4 0 0.6 1;0.4 0 0.6 1;0.4 0 0.6 1"/></rect>
+<line x1="132" y1="308" x2="1028" y2="308" stroke="#c0613c" stroke-width="1.6" marker-end="url(#ah-c0613c)" opacity="0.8"/>
+<text x="580.0" y="304" text-anchor="middle" font-size="10.5" font-style="italic" fill="#c0613c">denoising wavefront sweeps forward</text>
+<text x="264" y="478" text-anchor="middle" font-size="11" font-style="italic" fill="#5d8a8a">clean context · k = 0</text>
+<text x="811.0" y="478" text-anchor="middle" font-size="11" font-style="italic" fill="#c0613c">uncertain future · k = K</text>
+<text x="580.0" y="500" text-anchor="middle" font-size="12" fill="#2c2722">Past frames stay clean as context while the next frame is denoised and the future stays noisy, so the model rolls out one frame at a time and stays stable.</text>
 </svg>
