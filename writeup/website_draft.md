@@ -276,10 +276,10 @@ At runtime, the live frame is localized against the cache, Dijkstra finds the pa
 
 Both the weld threshold and the waypoint spacing are calibrated from data. I set the weld threshold from the inter-frame distance distribution, picking the point that separates same-place views from different-place views. For waypoint spacing, I measured a reliability curve showing that one-step descent succeeds 96% of the time at 2 chunks and falls off beyond that, so I place waypoints at the 90% reliability point.
 
-[FIGURE: ✅ assets/route_montage.png (wide)]
+[FIGURE: ✅ assets/route_montage.png]
 *A route is a film strip. Dijkstra returns a sequence of remembered frames and the planner chases them one at a time.*
 
-[FIGURE: ✅ assets/subgoal-graph-anim.mp4 — wide, controls]
+[FIGURE: ✅ assets/subgoal-graph-anim.mp4 — controls]
 *Building and routing the graph. Episodes become nodes, shared views weld threads together, Dijkstra hands the planner one waypoint at a time.*
 
 ---

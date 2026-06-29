@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>NanoNAV — real-robot navigation with Nano World Models</title>
 <meta name="description" content="Latent-space planning with a Nano World Model drives a LeKiwi robot to goal images — learned from 25 minutes of driving, no maps, no depth, no pose.">
-<link rel="stylesheet" href="style.css?v=1782695385">
+<link rel="stylesheet" href="style.css?v=1782695436">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
 <script type="module" src="https://ajax.googleapis.com/ajax/libs/model-viewer/4.0.0/model-viewer.min.js"></script>
 </head>
@@ -329,12 +329,12 @@
 
 <p>Both the weld threshold and the waypoint spacing are calibrated from data. I set the weld threshold from the inter-frame distance distribution, picking the point that separates same-place views from different-place views. For waypoint spacing, I measured a reliability curve showing that one-step descent succeeds 96% of the time at 2 chunks and falls off beyond that, so I place waypoints at the 90% reliability point.</p>
 
-<figure class="wide">
+<figure>
   <img src="assets/route_montage.png?v=bfb1970b" alt="">
   <figcaption><b>A route is a film strip.</b> Dijkstra returns a sequence of remembered frames and the planner chases them one at a time.</figcaption>
 </figure>
 
-<figure class="wide">
+<figure>
   <video src="assets/subgoal-graph-anim.mp4?v=b53cab6b" controls loop muted playsinline></video>
   <figcaption><b>Building and routing the graph.</b> Episodes become nodes, shared views weld threads together, Dijkstra hands the planner one waypoint at a time.</figcaption>
 </figure>
