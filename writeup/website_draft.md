@@ -210,7 +210,7 @@ To find out why, I measured three candidate metrics at tape-marked positions acr
 | Metric | Ordering (ρ) | Far-field signal / noise | Why it fails |
 |---|---|---|---|
 | Pixel L1 | 1.00 | 706×, 386× | Strong signal, but lateral ordering breaks. The metric increases when moving sideways even when that sideways position is closer, so CEM would overcorrect. |
-| **SD-VAE latent L2** | 1.00 | **1.25×, 0.80×** | Perfect global ordering, but the far-field gradient is at or below the noise floor. CEM cannot see progress more than ~25 cm out. [TODO: validate on H100 — does VAE actually succeed at close range (near band 1.25× is marginal), or does it fail there too? Determines whether "blind beyond ~25 cm" is accurate or should be "blind at all ranges"] |
+| **SD-VAE latent L2** | 1.00 | **1.25×, 0.80×** | Perfect global ordering, but the far-field gradient is at or below the noise floor. CEM cannot see progress more than ~25 cm out. |
 | **Frozen DINOv2 patch cosine** | 0.94 | **12×, 21×** | Passes both. |
 
 [FIGURE: ✅ assets/metric_comparison.png]
