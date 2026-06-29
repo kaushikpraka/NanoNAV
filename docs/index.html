@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>NanoNAV — real-robot navigation with Nano World Models</title>
 <meta name="description" content="Latent-space planning with a Nano World Model drives a LeKiwi robot to goal images — learned from 25 minutes of driving, no maps, no depth, no pose.">
-<link rel="stylesheet" href="style.css?v=1782699795">
+<link rel="stylesheet" href="style.css?v=1782700187">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
 <script type="module" src="https://ajax.googleapis.com/ajax/libs/model-viewer/4.0.0/model-viewer.min.js"></script>
 </head>
@@ -364,7 +364,7 @@
 <p>In the first run the robot starts facing the curtained wall, with no visual overlap between its starting view and the goal frame. It has to plan a route through the graph before it can make any progress toward the goal. Both videos are sped up significantly. Each three-step plan takes roughly 7 seconds to generate on an H100 and the robot executes the first action before replanning.</p>
 
 <figure>
-  <img src="assets/hamper_startgoal.jpg?v=c7f452d6" alt="">
+  <img src="assets/hamper_startgoal.jpg?v=e44cd0e8" alt="">
   <figcaption><b>Start and goal for this run, side by side.</b> The goal is a photograph captured beforehand at the destination, and the planner has to route through the graph to connect the two.</figcaption>
 </figure>
 
@@ -379,7 +379,7 @@
 <p>The second run reaches a fan across the room, again routing through the graph from a start with no overlap with the goal.</p>
 
 <figure>
-  <img src="assets/nearfan2_startgoal.jpg?v=17403876" alt="">
+  <img src="assets/nearfan2_startgoal.jpg?v=6a06d4d8" alt="">
   <figcaption><b>Start and goal for the fan run.</b> As before, the goal image was captured at the destination ahead of time.</figcaption>
 </figure>
 
