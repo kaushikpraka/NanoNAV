@@ -15,7 +15,7 @@
 <meta name="twitter:title" content="NanoNAV: real-robot navigation with Nano World Models">
 <meta name="twitter:description" content="Latent-space planning with a Nano World Model drives a LeKiwi robot to goal images, learned from 25 minutes of driving, no maps, no depth, no pose.">
 <meta name="twitter:image" content="https://kaushikpraka.github.io/NanoNAV/assets/og_card.jpg">
-<link rel="stylesheet" href="style.css?v=1782716676">
+<link rel="stylesheet" href="style.css?v=1782717540">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
 <script type="module" src="https://ajax.googleapis.com/ajax/libs/model-viewer/4.0.0/model-viewer.min.js"></script>
 </head>
@@ -37,7 +37,7 @@
 
 <div class="tldr">
   <span class="label">TL;DR</span>
-  I taught a <a href="https://github.com/SIGRobotics-UIUC/LeKiwi"><strong>LeKiwi</strong></a> mobile manipulator to drive to a <strong>photograph</strong>. Show it an image taken somewhere in the room and it finds its way there, using a stack learned entirely through an overhead camera and ~50 teleoperated episodes. A diffusion world model imagines candidate futures in latent space, a sampling-based planner picks the actions whose imagined outcome best matches the goal in frozen <strong>DINOv2</strong> semantic token space, and a 4,500-node graph of moments from the training data carries the robot to goals beyond the model's local horizon. Switching from VAE reconstruction latents to DINOv2 tokens as the scoring space was the critical pivot, because the VAE metric goes blind beyond ~25 cm while DINOv2 maintains a usable gradient across the full range. No metric map, no depth sensor, no external localization.
+  I taught a <a href="https://github.com/SIGRobotics-UIUC/LeKiwi"><strong>LeKiwi</strong></a> mobile manipulator to drive to a <strong>picture</strong>. Show it an image taken somewhere in the room and it finds its way there, using a stack learned entirely through an overhead camera and ~50 teleoperated episodes. A diffusion world model imagines candidate futures in latent space, a sampling-based planner picks the actions whose imagined outcome best matches the goal in frozen <strong>DINOv2</strong> semantic token space, and a 4,500-node graph of moments from the training data carries the robot to goals beyond the model's local horizon. Switching from VAE reconstruction latents to DINOv2 tokens as the scoring space was the critical pivot, because the VAE metric goes blind beyond ~25 cm while DINOv2 maintains a usable gradient across the full range. No metric map, no depth sensor, no external localization.
 </div>
 
 <nav class="toc">
@@ -373,7 +373,7 @@
 
 <figure>
   <img src="assets/hamper_startgoal.jpg?v=e44cd0e8" alt="">
-  <figcaption><b>Start and goal for this run, side by side.</b> The goal is a photograph captured beforehand at the destination, and the planner has to route through the graph to connect the two.</figcaption>
+  <figcaption><b>Start and goal for this run, side by side.</b> The goal is captured beforehand at the destination, and the planner has to route through the graph to connect the two.</figcaption>
 </figure>
 
 <figure>
@@ -405,7 +405,7 @@
 
 <p><strong>Bounded by training data.</strong> The graph, world model, and distance metric all assume the robot is in the same room it drove through during collection. DINOv2 embeddings will generalize to new environments, but whether the learned action-to-latent dynamics will transfer is an open question worth testing.</p>
 
-<p><strong>Goals must be photographed in advance.</strong> A goal is specified as an image captured beforehand at the destination, from the same overhead camera the robot navigates with. Keeping the goal in image space is what lets the whole pipeline run with no maps and no coordinates, but it is also a real drawback. The robot can only be sent to places that have already been visited and photographed from the right vantage point, so it cannot yet be pointed at a coordinate, a spoken instruction, or a picture taken from a phone. Each of those would need an extra grounding step that maps the request back into the robot's own camera space, which this system does not have.</p>
+<p><strong>Goals must be captured in advance.</strong> A goal is specified as an image captured beforehand at the destination, from the same overhead camera the robot navigates with. Keeping the goal in image space is what lets the whole pipeline run with no maps and no coordinates, but it is also a real drawback. The robot can only be sent to places that have already been visited and captured from the right vantage point, so it cannot yet be pointed at a coordinate, a spoken instruction, or a picture taken from a phone. Each of those would need an extra grounding step that maps the request back into the robot's own camera space, which this system does not have.</p>
 
 <p><strong>Navigational precision.</strong> The robot reliably reaches the goal area, but the final pose can be offset in translation and rotation, most visibly in the third no-graph demo where the robot converges to the right location but does not pixel-match the goal. A visual-servo step that can strafe and reverse would close that gap more reliably than asking CEM to solve a millimeter-level docking problem.</p>
 

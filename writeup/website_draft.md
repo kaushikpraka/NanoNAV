@@ -28,7 +28,7 @@
 
 ## TL;DR
 
-I taught a [**LeKiwi**](https://github.com/SIGRobotics-UIUC/LeKiwi) mobile manipulator to drive to a **photograph**. Show it an image taken somewhere in the room and it finds its way there, using a stack learned entirely through an overhead camera and ~50 teleoperated episodes. A diffusion world model imagines candidate futures in latent space, a sampling-based planner picks the actions whose imagined outcome best matches the goal in frozen **DINOv2** semantic token space, and a 4,500-node graph of moments from the training data carries the robot to goals beyond the model's local horizon. Switching from VAE reconstruction latents to DINOv2 tokens as the scoring space was the critical pivot, because the VAE metric goes blind beyond ~25 cm while DINOv2 maintains a usable gradient across the full range. No metric map, no depth sensor, no external localization.
+I taught a [**LeKiwi**](https://github.com/SIGRobotics-UIUC/LeKiwi) mobile manipulator to drive to a **picture**. Show it an image taken somewhere in the room and it finds its way there, using a stack learned entirely through an overhead camera and ~50 teleoperated episodes. A diffusion world model imagines candidate futures in latent space, a sampling-based planner picks the actions whose imagined outcome best matches the goal in frozen **DINOv2** semantic token space, and a 4,500-node graph of moments from the training data carries the robot to goals beyond the model's local horizon. Switching from VAE reconstruction latents to DINOv2 tokens as the scoring space was the critical pivot, because the VAE metric goes blind beyond ~25 cm while DINOv2 maintains a usable gradient across the full range. No metric map, no depth sensor, no external localization.
 
 ---
 
@@ -306,7 +306,7 @@ With the graph closing the loop, the planner can finally reach goals well outsid
 In the first run the robot starts facing the curtained wall, with no visual overlap between its starting view and the goal frame. It has to plan a route through the graph before it can make any progress toward the goal. Both videos are sped up significantly. Each three-step plan takes roughly 7 seconds to generate on an H100 and the robot executes the first action before replanning.
 
 [FIGURE: ✅ assets/hamper_startgoal.jpg]
-*Start and goal for this run, side by side. The goal is a photograph captured beforehand at the destination, and the planner has to route through the graph to connect the two.*
+*Start and goal for this run, side by side. The goal is captured beforehand at the destination, and the planner has to route through the graph to connect the two.*
 
 [FIGURE_PAIR: ✅ assets/plan-demo-6s.mp4 | assets/topdown_graph_hamper-6s.mp4 — synced planner view and overhead camera for a successful graph-guided run to the hamper]
 *Planner visualization (left) and overhead camera (right), synchronized. The planner routes through waypoints and drives to the goal. The overhead recording is compressed roughly 83× from the original 15-minute run.*
@@ -327,7 +327,7 @@ My goal with this project was never to build the most capable navigation system.
 
 **Bounded by training data.** The graph, world model, and distance metric all assume the robot is in the same room it drove through during collection. DINOv2 embeddings will generalize to new environments, but whether the learned action-to-latent dynamics will transfer is an open question worth testing.
 
-**Goals must be photographed in advance.** A goal is specified as an image captured beforehand at the destination, from the same overhead camera the robot navigates with. Keeping the goal in image space is what lets the whole pipeline run with no maps and no coordinates, but it is also a real drawback. The robot can only be sent to places that have already been visited and photographed from the right vantage point, so it cannot yet be pointed at a coordinate, a spoken instruction, or a picture taken from a phone. Each of those would need an extra grounding step that maps the request back into the robot's own camera space, which this system does not have.
+**Goals must be captured in advance.** A goal is specified as an image captured beforehand at the destination, from the same overhead camera the robot navigates with. Keeping the goal in image space is what lets the whole pipeline run with no maps and no coordinates, but it is also a real drawback. The robot can only be sent to places that have already been visited and captured from the right vantage point, so it cannot yet be pointed at a coordinate, a spoken instruction, or a picture taken from a phone. Each of those would need an extra grounding step that maps the request back into the robot's own camera space, which this system does not have.
 
 **Navigational precision.** The robot reliably reaches the goal area, but the final pose can be offset in translation and rotation, most visibly in the third no-graph demo where the robot converges to the right location but does not pixel-match the goal. A visual-servo step that can strafe and reverse would close that gap more reliably than asking CEM to solve a millimeter-level docking problem.
 
