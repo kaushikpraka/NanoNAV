@@ -59,7 +59,7 @@ def snapshot(i, cx, cy, rx, ry, label, winner=False):
     if winner:
         s.append(f'<circle cx="{GX-9}" cy="{GY+9}" r="6" fill="{TERRA_EC}" '
                  f'stroke="#fffdf6" stroke-width="1.6"/>')
-        s.append(f'<text x="{GX-9}" y="{GY+34}" text-anchor="middle" font-size="11" '
+        s.append(f'<text x="{GX-9}" y="{GY+62}" text-anchor="middle" font-size="11" '
                  f'font-style="italic" fill="{TERRA_TX}">winning plan</text>')
     s.append(f'<text x="330" y="128" text-anchor="middle" font-size="12.5" '
              f'fill="{INK}">{label}</text>')
@@ -122,8 +122,9 @@ parts.append(snapshot(3, 500, 178, 28, 22, 'iteration 4 · converged', winner=Tr
 for r, op in ((16, 0.25), (10, 0.45), (4.5, 1)):
     parts.append(f'<circle cx="{GX}" cy="{GY}" r="{r}" fill="{TERRA_EC}" '
                  f'fill-opacity="{op}"/>')
-parts.append(f'<text x="{GX+14}" y="{GY-10}" font-size="12" font-style="italic" '
-             f'fill="{TERRA_TX}">goal latent z_g</text>')
+parts.append(f'<text x="{GX}" y="{GY-26}" text-anchor="middle" font-size="12" '
+             f'font-style="italic" fill="{TERRA_TX}">goal latent '
+             f'z<tspan baseline-shift="sub" font-size="9">g</tspan></text>')
 
 # ── right: the five-step loop ──────────────────────────────────────────────
 steps = [

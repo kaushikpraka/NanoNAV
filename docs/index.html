@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>NanoNAV — real-robot navigation with Nano World Models</title>
 <meta name="description" content="Latent-space planning with a Nano World Model drives a LeKiwi robot to goal images — learned from 25 minutes of driving, no maps, no depth, no pose.">
-<link rel="stylesheet" href="style.css?v=1782697341">
+<link rel="stylesheet" href="style.css?v=1782697598">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
 <script type="module" src="https://ajax.googleapis.com/ajax/libs/model-viewer/4.0.0/model-viewer.min.js"></script>
 </head>
@@ -180,8 +180,8 @@
 </ol>
 
 <figure>
-  <img src="assets/cem_planning.svg?v=e72ea1aa" alt="">
-  <figcaption><b>The CEM planning loop.</b> Each iteration draws a batch of candidate action plans from a Gaussian, rolls each through the world model, and scores the imagined endpoint by its latent distance to the goal. The best fraction, the elites, are kept and the Gaussian is refit around them, so the search narrows toward the plans that land closest to the goal. After a few iterations the planner executes the first chunk of the winner and replans from the new observation.</figcaption>
+  <img src="assets/cem_planning.svg?v=7a9fb9c8" alt="">
+  <figcaption>The CEM planning loop.</figcaption>
 </figure>
 
 <p>The initial score was the <strong>L2 over the flattened VAE latent</strong>. The Nano World Models paper had reported 25% planning success on PushT using exactly this representation, making it the natural starting point.</p>
