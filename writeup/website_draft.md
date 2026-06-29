@@ -126,7 +126,7 @@ Training uses [**Diffusion Forcing**](https://arxiv.org/abs/2407.01392) (Chen et
 
 ## 5 · Road to Planning
 
-Everything above is setup. What follows is the build log, each attempt, what broke, and what it taught. The full diagnostic path is below, but here is the punchline first. The initial model's temporal stride was too short, leaving the action signal buried in noise. The VAE latent is globally ordered but loses its gradient beyond ~25 cm, giving CEM nothing to minimize. Switching the prediction and scoring target to frozen DINOv2 semantic tokens restores that gradient across the full range. A topological graph of training frames then extends the planner's reach to goals beyond its local horizon.
+Everything above is setup. What follows is the full build log, each attempt, what broke, and what it taught. The full diagnostic path is below, but here is the short version first. The initial model's temporal stride was too short, leaving the action signal buried in noise. The VAE latent is globally ordered but loses its gradient beyond ~25 cm, giving CEM nothing to minimize. Switching the prediction and scoring target to frozen DINOv2 semantic tokens restores that gradient across the full range. A topological graph of training frames then extends the planner's reach to goals beyond its local horizon.
 
 ### Planning: MPC + CEM in latent space
 
